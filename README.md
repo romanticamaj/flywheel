@@ -28,17 +28,22 @@ AI coding agents burn through their context window on large projects. The usual 
 
 ### Install
 
-Add flywheel as a plugin directory in your Claude Code session:
-
 ```bash
-claude --plugin-dir /path/to/flywheel
+# Clone the plugin
+git clone https://github.com/romanticamaj/flywheel.git ~/.claude/plugins/flywheel
 ```
 
-Or add it to your project's `.claude/settings.json`:
+Then add it to your Claude Code session:
+
+```bash
+claude --plugin-dir ~/.claude/plugins/flywheel
+```
+
+Or add it permanently to your project's `.claude/settings.json`:
 
 ```json
 {
-  "pluginDirs": ["/path/to/flywheel"]
+  "pluginDirs": ["~/.claude/plugins/flywheel"]
 }
 ```
 
@@ -243,6 +248,10 @@ The tests invoke Claude Code in print mode against a mock Node.js project with t
 | **cli-continues** (977 stars) | Cross-tool portable context export | Structured feature checklist + acceptance criteria |
 | **HANDOFF.md pattern** | Freeform markdown handoff | Machine-readable JSON, enforced schema, log rotation |
 | **LangGraph checkpointing** | Framework-level state persistence | Agent-level session protocol, works with any Claude Code setup |
+
+## Contributing
+
+Issues and PRs welcome at [github.com/romanticamaj/flywheel](https://github.com/romanticamaj/flywheel).
 
 ## License
 
