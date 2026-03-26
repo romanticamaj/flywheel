@@ -1,0 +1,10 @@
+{
+  "name": "flywheel",
+  "description": "Zero-cost session handoffs for long-running agent work. Initializer + Coding Agent relay protocol with pluggable planning, multi-agent, and review spokes.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Gary Hsieh"
+  },
+  "license": "MIT",
+  "keywords": ["long-running", "flywheel", "planning", "multi-agent", "review", "agentic-coding"]
+}
