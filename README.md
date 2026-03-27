@@ -50,7 +50,7 @@ Or add it permanently to your project's `.claude/settings.json`:
 ### Initialize (once per project)
 
 ```
-> I want to start a new project with flywheel.
+/flywheel:init
 ```
 
 Flywheel detects your installed tools, lets you choose per spoke, and creates `.flywheel/` with:
@@ -66,7 +66,7 @@ Flywheel detects your installed tools, lets you choose per spoke, and creates `.
 ### Run (each session)
 
 ```
-> Start a flywheel coding agent session.
+/flywheel:relay
 ```
 
 The agent follows a **9-step loop**:

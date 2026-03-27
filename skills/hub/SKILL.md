@@ -46,11 +46,11 @@ Each spoke is independent and defines its own contract, detection logic, and fra
 
 ## Quick Start
 
-1. Tell the agent: "I want to start a new project with flywheel."
-2. The agent runs the **Initializer** — detects installed tools, asks you to choose per spoke, and creates `.flywheel/` artifacts (config, checklist, init scripts, empty handoff log).
+1. Run `/flywheel:init` to set up the project.
+2. The Initializer detects installed tools, asks you to choose per spoke, and creates `.flywheel/` artifacts (config, checklist, init scripts, empty handoff log).
 3. Describe your features. The agent generates a prioritized `feature-checklist.json`.
-4. Start working: each new session runs the **Coding Agent** loop — picks the next feature, implements it, reviews it, commits merge-ready code, and writes a handoff entry.
-5. Repeat until the checklist is complete.
+4. Run `/flywheel:relay` to start a coding session — picks the next feature, implements it, reviews it, commits merge-ready code, and writes a handoff entry.
+5. Repeat `/flywheel:relay` until the checklist is complete.
 
 ## flywheel-config.json Reference
 
