@@ -81,6 +81,12 @@ Path: `.flywheel/flywheel-config.json`
       "e2e": ["gstack:/qa", "playwright"]
     }
   },
+  "source": {
+    "type": "file",
+    "paths": ["SPEC.md"],
+    "user_notes": "Also add rate limiting on all endpoints",
+    "resolved_at": "2026-03-27T00:00:00Z"
+  },
   "scope_rule": "one-feature-per-session",
   "exit_rule": "merge-ready",
   "branch_naming": "feat/{id}-{slug}"
@@ -98,6 +104,10 @@ Path: `.flywheel/flywheel-config.json`
 | `review.layers` | string[] | Fixed 4-layer pipeline: `["self-review", "code-review", "cross-model", "e2e"]` |
 | `review.tools` | object | Per-layer tool choice; `null` means layer is skipped |
 | `review.alternatives` | object | Per-layer list of known tools for future upgrades |
+| `source.type` | string | How the checklist was sourced: `"file"`, `"user-input"`, `"codebase"`, or `"mixed"` |
+| `source.paths` | string[] | Spec files used as input |
+| `source.user_notes` | string\|null | Extra context from user conversation |
+| `source.resolved_at` | string | ISO 8601 timestamp |
 | `scope_rule` | enum | `"one-feature-per-session"` — enforces single-feature sessions |
 | `exit_rule` | enum | `"merge-ready"` — no WIP commits allowed |
 | `branch_naming` | template | Branch name pattern with `{id}` and `{slug}` placeholders |

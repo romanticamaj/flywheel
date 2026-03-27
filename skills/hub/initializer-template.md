@@ -267,10 +267,78 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
 | `scope_rule` | string | `"one-feature-per-session"` |
 | `exit_rule` | string | `"merge-ready"` |
 | `branch_naming` | string | Template with `{id}` and `{slug}` placeholders |
+| `source.type` | string | `"file"`, `"user-input"`, `"codebase"`, or `"mixed"` |
+| `source.paths` | string[] | Spec files used as input (empty if none) |
+| `source.user_notes` | string\|null | Extra context from user conversation |
+| `source.resolved_at` | string | ISO 8601 timestamp of when source was resolved |
 
 ### `.flywheel/feature-checklist.json`
 
-Create an empty version-1 wrapper, then prompt the user to describe their features:
+#### Source Resolution (run before generating the checklist)
+
+The checklist needs a source — a spec, requirements, or user description. Resolve the source using this priority order:
+
+**Step 1: Collect all available context.**
+
+Gather from three layers, in order:
+
+| Layer | What to check | Examples |
+|-------|--------------|---------|
+| **A. User input** | Anything the user said in the current conversation before or alongside `/flywheel:init` | "Build a todo app with auth", pasted requirements, linked docs |
+| **B. Repo files** | Scan the project root and common locations for spec-like files | See detection table below |
+| **C. Existing work** | Check git log, existing code structure, README for implied features | `git log --oneline -20`, directory structure |
+
+**File detection — scan for these patterns (first match per category):**
+
+| Pattern | What it likely contains |
+|---------|----------------------|
+| `SPEC.md`, `spec.md`, `SPEC` | Product specification |
+| `PRD.md`, `prd.md` | Product requirements document |
+| `REQUIREMENTS.md`, `requirements.md`, `REQUIREMENTS.txt` | Feature requirements |
+| `DESIGN.md`, `design.md` | Design document |
+| `TODO.md`, `todo.md`, `TODOS.md` | Task list |
+| `openspec/`, `specs/` | OpenSpec or structured specs directory |
+| `.github/ISSUE_TEMPLATE/` or GitHub issues | Issue-driven development |
+| `CLAUDE.md` | May contain project goals or context |
+| `README.md` | May describe intended features |
+
+**Step 2: Merge and present.**
+
+| What was found | Action |
+|----------------|--------|
+| User described features + spec files found | Merge both. Show: "I found `SPEC.md` and your description. I'll combine them into the checklist. Here's what I extracted — anything to add or change?" |
+| User described features, no spec files | Use user input directly. Confirm: "Here's the checklist from your description — anything to add?" |
+| No user input, spec files found | Parse the spec files. Show: "I found `PRD.md` — here are the features I extracted. Any changes or additions?" |
+| No user input, no spec files, but existing code | Analyze the codebase. Show: "No spec found, but I see existing code. Here's what I think the project needs next — correct me." |
+| Nothing found at all | Ask: "No spec or description found. Describe the features you want to build — bullet points, a paragraph, or paste a spec." |
+
+**Step 3: Record the source in config.**
+
+Add a `source` field to `flywheel-config.json`:
+
+```json
+{
+  "source": {
+    "type": "file",
+    "paths": ["SPEC.md"],
+    "user_notes": "Also add rate limiting on all endpoints",
+    "resolved_at": "2026-03-27T00:00:00Z"
+  }
+}
+```
+
+Valid `type` values: `"file"`, `"user-input"`, `"codebase"`, `"mixed"`.
+
+- `"file"` — checklist derived from spec files
+- `"user-input"` — checklist from user's conversation input
+- `"codebase"` — checklist inferred from existing code
+- `"mixed"` — combination of sources
+
+`paths` lists which files were used. `user_notes` captures any extra context the user provided on top of the detected sources. Both can be empty arrays/null.
+
+#### Generating the checklist
+
+After source resolution, create the version-1 wrapper and populate features:
 
 ```json
 {
@@ -278,12 +346,6 @@ Create an empty version-1 wrapper, then prompt the user to describe their featur
   "features": []
 }
 ```
-
-After generating the empty wrapper, prompt:
-
-> Describe the features you want to build. I will create a prioritized checklist with acceptance criteria.
->
-> You can list them as bullet points, a paragraph, or paste a spec. I will structure them into the checklist format.
 
 Each feature entry follows this schema:
 
