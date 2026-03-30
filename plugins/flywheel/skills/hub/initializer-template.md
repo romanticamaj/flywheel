@@ -97,120 +97,101 @@ Create the initial commit containing all generated artifacts. See Section 5 for 
 
 ## 2. Tool Selection Prompts
 
-Present these prompts to the user during Initializer setup. Replace `[detected]` with the actual tools found in Step 4.
+**Always show all known tools**, not just detected ones. Mark each tool's availability so the user can see what they're missing and install it if they want. This lets users make informed choices instead of only seeing what's already installed.
 
-### Planning Spoke
+### Presentation format
 
-**Multiple tools detected:**
+For each spoke, present a **full tool menu** using this format:
 
-> I detected the following planning tools: [detected].
+```
+[Spoke Name] — [what this spoke does]
+
+  1. ✅ tool-name — [description]                    (installed)
+  2. ⬜ tool-name — [description]                    (not installed)
+     Install: [install command]
+  3. ✅ built-in — [description]                      (always available)
+```
+
+- **✅** = detected in Steps 1-3
+- **⬜** = known but not installed, with install command shown
+- The user can pick any option. If they pick an uninstalled tool, **pause and help them install it** before continuing.
+
+### Full Tool Catalog
+
+Present one table per spoke. Always include every tool in the catalog, regardless of detection.
+
+#### Planning
+
+> **Planning** — generates the prioritized feature checklist from your spec.
 >
-> Which would you like to use for planning?
-> 1. **[detected tool 1]**
-> 2. **[detected tool 2]**
-> 3. **built-in** (Claude generates feature-checklist.json directly, no dependencies)
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **planning-with-files** | File-based planning with task_plan.md, findings.md, progress.md | `npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g` |
+> | 2 | ✅/⬜ | **superpowers** | Brainstorming + writing-plans skills | Already a Claude Code plugin — install via `/plugin install superpowers` |
+> | 3 | ✅/⬜ | **OpenSpec** | Structured proposal.md + specs/ directory | `npm install -g openspec` |
+> | 4 | ✅ | **built-in** | Claude generates feature-checklist.json directly, no dependencies | Always available |
+
+#### Multi-Agent
+
+> **Multi-agent** — coordinates parallel agents working on separate features.
 >
-> Enter your choice (number or name):
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **gstack** | Conductor for parallel sprints + /plan-ceo-review, /plan-eng-review, /review, /qa, /ship | `git clone` gstack repo, add as plugin |
+> | 2 | ✅/⬜ | **superpowers** | dispatching-parallel-agents, subagent-driven-development | Already a Claude Code plugin — install via `/plugin install superpowers` |
+> | 3 | ✅ | **claude-code-native** | Built-in `--worktree` isolation + `Agent` tool, no dependencies | Always available |
 
-**One tool detected:**
+#### Review — Self-review
 
-> I detected **[tool name]** for planning. Would you like to use it, or stick with the built-in default?
-> 1. **[tool name]**
-> 2. **built-in** (Claude generates feature-checklist.json directly, no dependencies)
-
-**No tools detected:**
-
-> No external planning tools detected. Using **built-in** planning (Claude generates feature-checklist.json directly).
+> **Self-review** — catches dead code, duplication, unnecessary complexity.
 >
-> For richer planning, you can install one of these:
-> - **planning-with-files:** `npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g`
-> - **OpenSpec:** `npm install openspec`
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **superpowers /simplify** | Code simplifier agent | Already a Claude Code plugin — install via `/plugin install superpowers` |
+> | 2 | ✅/⬜ | **gstack /simplify** | gstack code simplifier | Add gstack as plugin |
+> | 3 | ✅ | **built-in** | Manual diff review prompt | Always available |
+
+#### Review — Code review
+
+> **Code review** — catches logic bugs, security issues, convention violations.
 >
-> Want to proceed with built-in for now? (Y/n)
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **gstack /review** | Pre-landing PR review with SQL safety, trust boundary analysis | Add gstack as plugin |
+> | 2 | ✅/⬜ | **superpowers code-reviewer** | Code reviewer subagent | Already a Claude Code plugin — install via `/plugin install superpowers` |
+> | 3 | ✅ | **built-in** | Spawn a code-reviewer subagent with built-in prompt | Always available |
 
-### Multi-Agent Spoke
+#### Review — Cross-model
 
-**Multiple tools detected:**
-
-> I detected the following multi-agent coordination tools: [detected].
+> **Cross-model** — catches systematic biases and blind spots of the authoring model.
 >
-> Which would you like to use for multi-agent coordination?
-> 1. **[detected tool 1]**
-> 2. **[detected tool 2]**
-> 3. **claude-code-native** (built-in `--worktree` isolation + `Agent` tool, no dependencies)
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **gemini-cli** | Gemini CLI for second-opinion review | Install: `npm install -g @anthropic-ai/gemini-cli` or check if `gemini` is in PATH |
+> | 2 | ✅/⬜ | **gstack /codex** | OpenAI Codex CLI wrapper for adversarial review | Add gstack as plugin |
+> | 3 | ✅/⬜ | **codex-cli** | Codex CLI directly | Install: `npm install -g @openai/codex` or check if `codex` is in PATH |
+> | 4 | — | **Skip** | Disable this layer | — |
+
+#### Review — E2E
+
+> **E2E verification** — proves the feature actually works end-to-end.
 >
-> Enter your choice (number or name):
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **gstack /qa** | Systematic QA testing with headless browser, finds + fixes bugs | Add gstack as plugin |
+> | 2 | ✅/⬜ | **Playwright** | Browser automation for E2E tests | `npm install playwright` |
+> | 3 | ✅ | **built-in** | Run init script + test suite + health check | Always available |
 
-**One tool detected:**
+### Install-on-demand flow
 
-> I detected **[tool name]** for multi-agent coordination. Would you like to use it, or stick with Claude Code native?
-> 1. **[tool name]**
-> 2. **claude-code-native** (built-in `--worktree` isolation + `Agent` tool, no dependencies)
+If the user picks a tool marked ⬜ (not installed):
 
-**No tools detected (only native available):**
+1. Show the install command.
+2. Ask: "Want me to install it now, or proceed with a different option?"
+3. If yes — run the install command, verify it worked, then continue.
+4. If no — ask them to pick another option.
 
-> Using **claude-code-native** for multi-agent coordination (built-in `--worktree` isolation + `Agent` tool).
->
-> For richer coordination, you can install:
-> - **gstack:** provides Conductor for parallel sprints, /plan-ceo-review, /plan-eng-review, /review, /qa, /ship
-> - **superpowers:** provides dispatching-parallel-agents, subagent-driven-development
->
-> Want to proceed with claude-code-native for now? (Y/n)
-
-### Review Spoke (per layer)
-
-Prompt separately for each review layer:
-
-**Self-review layer:**
-
-> **Self-review layer** — catches dead code, duplication, unnecessary complexity.
->
-> Detected tools: [detected or "none"].
-> 1. **[detected tool]** (if any)
-> 2. **built-in** (manual review prompt)
->
-> For richer self-review, you can install:
-> - **superpowers /simplify:** already a Claude Code plugin
-
-**Code-review layer:**
-
-> **Code-review layer** — catches logic bugs, security issues, convention violations.
->
-> Detected tools: [detected or "none"].
-> 1. **[detected tool 1]** (if any)
-> 2. **[detected tool 2]** (if any)
-> 3. **built-in** (manual review prompt)
->
-> For richer code review, you can install:
-> - **gstack /review**
-> - **superpowers code-reviewer**
-
-**Cross-model layer:**
-
-> **Cross-model layer** — catches systematic biases and blind spots of the authoring model.
->
-> Detected tools: [detected or "none"].
-> 1. **[detected tool 1]** (if any)
-> 2. **[detected tool 2]** (if any)
-> 3. **Skip this layer** (no built-in default available)
->
-> To enable cross-model review, install one of:
-> - **Gemini CLI:** `gemini` command in PATH
-> - **Codex CLI:** `codex` command in PATH
-> - **gstack /codex**
-
-**E2E verification layer:**
-
-> **E2E verification layer** — catches integration failures, broken UI, API contract violations.
->
-> Detected tools: [detected or "none"].
-> 1. **[detected tool 1]** (if any)
-> 2. **[detected tool 2]** (if any)
-> 3. **built-in** (run init script + test suite + health check)
->
-> For richer E2E testing, you can install:
-> - **Playwright:** `npm install playwright` or check if `playwright` is in PATH
-> - **gstack /qa**
+Do NOT silently skip uninstalled tools or auto-fallback to built-in.
 
 ---
 
