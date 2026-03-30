@@ -28,23 +28,18 @@ AI coding agents burn through their context window on large projects. The usual 
 
 ### Install
 
+**Add the marketplace and install the plugin:**
+
 ```bash
-# Clone the plugin
+/plugin marketplace add romanticamaj/flywheel
+/plugin install flywheel@flywheel-marketplace
+```
+
+**For development / testing (temporary, current session only):**
+
+```bash
 git clone https://github.com/romanticamaj/flywheel.git ~/.claude/plugins/flywheel
-```
-
-Then add it to your Claude Code session:
-
-```bash
 claude --plugin-dir ~/.claude/plugins/flywheel
-```
-
-Or add it permanently to your project's `.claude/settings.json`:
-
-```json
-{
-  "pluginDirs": ["~/.claude/plugins/flywheel"]
-}
 ```
 
 ### Initialize (once per project)

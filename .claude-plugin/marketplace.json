@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "flywheel-marketplace",
+  "description": "Zero-cost session handoffs for long-running AI coding agents.",
+  "owner": {
+    "name": "Gary Hsieh"
+  },
+  "plugins": [
+    {
+      "name": "flywheel",
+      "description": "Zero-cost session handoffs for long-running agent work. Initializer + Coding Agent relay protocol with pluggable planning, multi-agent, and review spokes.",
+      "version": "1.0.0",
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/romanticamaj/flywheel",
+      "license": "MIT",
+      "tags": ["long-running", "flywheel", "planning", "multi-agent", "review", "agentic-coding"]
+    }
+  ]
+}
