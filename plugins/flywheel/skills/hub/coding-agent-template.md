@@ -1,4 +1,4 @@
-# Coding Agent Template — 9-Step Session Loop
+# Coding Agent Template — 9-Step Session Loop (with Flow Summary)
 
 This template defines the loop that every Coding Agent session follows in the flywheel protocol. Each session picks up where the last left off, implements exactly one feature, and leaves the codebase merge-ready.
 
@@ -6,7 +6,7 @@ This template defines the loop that every Coding Agent session follows in the fl
 
 ## Stage Tracker
 
-Initialize a compliance tracker at the start of every session. Update it as each stage completes. Output the final table at session end (Step 9e).
+Initialize a compliance tracker at the start of every session. Update it as each stage completes. Output the final flow summary at session end (Step 9e).
 
 ```
 STAGE TRACKER (initialize at session start):
@@ -24,10 +24,7 @@ STAGE TRACKER (initialize at session start):
 │ 8b │ Review: code-review  │ {tool}     │              │        │
 │ 8c │ Review: cross-model  │ {tool}     │              │        │
 │ 8d │ Review: e2e          │ {tool}     │              │        │
-│ 9a │ Commit               │ —          │              │        │
-│ 9b │ Handoff log          │ —          │              │        │
-│ 9c │ Update checklist     │ —          │              │        │
-│ 9d │ Compliance table     │ —          │              │        │
+│ 9  │ Commit + handoff     │ —          │              │        │
 └────┴──────────────────────┴────────────┴──────────────┴────────┘
 
 Status values: ✅ OK | ⚠️ FALLBACK | ❌ SKIPPED | 🔄 PENDING
@@ -214,7 +211,7 @@ Use the feature ID and title from the checklist. Only add files that were change
 Append a single JSONL entry to `.flywheel/claude-progress.jsonl`:
 
 ```json
-{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","status":"completed","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"review":{"self-review":"superpowers:/simplify","code-review":"gstack:/review","cross-model":"skipped (disabled)","e2e":"built-in smoke test"},"next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
+{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","status":"completed","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"review":{"self-review":"superpowers:/simplify","code-review":"gstack:/review","cross-model":"skipped (disabled)","e2e":"built-in smoke test"},"planning":{"tool":"planning-with-files","output":"task_plan.md with 5 steps"},"multi_agent":{"tool":"not used","reason":"single-threaded implementation"},"compliance":{"total":16,"ok":15,"fallback":0,"skipped":1,"violations":0},"flow_summary":"Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: self-review OK, code-review OK, cross-model skipped (user-approved), e2e OK. 6/6 acceptance criteria met.","next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
 ```
 
 Fields:
@@ -225,6 +222,10 @@ Fields:
 - `changes` — array of short descriptions of what changed
 - `tests` — object with `unit` count, `e2e` count, and `all_passing` boolean
 - `review` — object recording which tool was used (or skipped/fallback) for each review layer
+- `planning` — object with `tool` used and `output` description
+- `multi_agent` — object with `tool` used and `reason` if not used
+- `compliance` — object with stage counts: `total`, `ok`, `fallback`, `skipped`, `violations`
+- `flow_summary` — single-line narrative of how planning, multi-agent, and review were used
 - `next_priority` — the feature ID the next session should pick up
 - `notes` — any context the next session needs to know
 
@@ -241,47 +242,84 @@ Check the entry count in `.flywheel/claude-progress.jsonl`. If it exceeds **50 e
 - Keep only the most recent 50 entries in the active file.
 - The Coding Agent only reads the active file; the archive is for human reference.
 
-### 9e. Output Compliance Table
+### 9e. Output Session Flow Summary
 
-**REQUIRED.** Output the completed stage tracker to the user. This is the session's accountability record.
+**REQUIRED.** Output the session flow summary to the user. This is the session's accountability record — one glanceable output that shows what ran, what was skipped, and what comes next.
+
+Format:
 
 ```
-SESSION COMPLIANCE — feat-XXX: <feature title>
-┌────┬──────────────────────┬──────────────────┬──────────────────────────────────────────┬──────────┐
-│ #  │ Stage                │ Configured       │ Actual                                   │ Status   │
-├────┼──────────────────────┼──────────────────┼──────────────────────────────────────────┼──────────┤
-│ 1  │ Validate config      │ —                │ Done                                     │ ✅ OK    │
-│ 2  │ Read handoff         │ —                │ 5 entries + git log                      │ ✅ OK    │
-│ 3  │ Read checklist       │ —                │ feat-006 selected                        │ ✅ OK    │
-│ 4  │ Bootstrap            │ init.sh          │ npm install + vite dev                   │ ✅ OK    │
-│ 5  │ Smoke test           │ —                │ npm run build passes                     │ ✅ OK    │
-│ 6  │ Plan                 │ planning-w-files │ task_plan.md created                     │ ✅ OK    │
-│ 7  │ Implement            │ —                │ orchestrator + service                   │ ✅ OK    │
-│ 8a │ Review: self-review  │ /simplify        │ superpowers:/simplify                    │ ✅ OK    │
-│ 8b │ Review: code-review  │ gstack:/review   │ gstack:/review                           │ ✅ OK    │
-│ 8c │ Review: cross-model  │ gstack:/codex    │ gstack:/codex — not found → skip (user)  │ ❌ SKIP  │
-│ 8d │ Review: e2e          │ gstack:/qa       │ gstack:/qa                               │ ✅ OK    │
-│ 9a │ Commit               │ —                │ 6 commits                                │ ✅ OK    │
-│ 9b │ Handoff log          │ —                │ Updated                                  │ ✅ OK    │
-│ 9c │ Update checklist     │ —                │ feat-006 → completed                     │ ✅ OK    │
-│ 9d │ Compliance table     │ —                │ This table                               │ ✅ OK    │
-└────┴──────────────────────┴──────────────────┴──────────────────────────────────────────┴──────────┘
-RESULT: 14/15 stages OK, 1 skipped (user-approved)
+SESSION FLOW SUMMARY — feat-XXX: <feature title>
+Branch: <branch name> | Commits: <commit hashes>
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ STAGE COMPLIANCE                                                                │
+├────┬──────────────────────┬──────────────────┬─────────────────────────┬────────┤
+│ #  │ Stage                │ Configured       │ Actual                  │ Status │
+├────┼──────────────────────┼──────────────────┼─────────────────────────┼────────┤
+│ 1  │ Validate config      │ —                │ Done                    │ ✅ OK  │
+│ 2  │ Read handoff         │ —                │ 5 entries + git log     │ ✅ OK  │
+│ 3  │ Read checklist       │ —                │ feat-006 selected       │ ✅ OK  │
+│ 4  │ Bootstrap            │ init.sh          │ npm install + vite dev  │ ✅ OK  │
+│ 5  │ Smoke test           │ —                │ npm run build passes    │ ✅ OK  │
+│ 6  │ Plan                 │ planning-w-files │ task_plan.md created    │ ✅ OK  │
+│ 7  │ Implement            │ —                │ 3 files created         │ ✅ OK  │
+│ 8a │ Review: self-review  │ /simplify        │ superpowers:/simplify   │ ✅ OK  │
+│ 8b │ Review: code-review  │ code-reviewer    │ code-reviewer agent     │ ✅ OK  │
+│ 8c │ Review: cross-model  │ codex            │ codex — not found       │ ❌ SKIP│
+│ 8d │ Review: e2e          │ built-in         │ npm test + curl :3000   │ ✅ OK  │
+│ 9  │ Commit + handoff     │ —                │ 2 commits, log updated  │ ✅ OK  │
+├────┴──────────────────────┴──────────────────┴─────────────────────────┴────────┤
+│ RESULT: 12/13 stages OK, 1 skipped (user-approved), 0 violations              │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ SPOKE USAGE                                                                     │
+├──────────────┬──────────────────┬───────────────────────────────────────────────┤
+│ Spoke        │ Tool             │ Detail                                        │
+├──────────────┼──────────────────┼───────────────────────────────────────────────┤
+│ Planning     │ planning-w-files │ task_plan.md with 5 steps                     │
+│ Multi-agent  │ not used         │ single-threaded — no parallelizable subtasks  │
+│ Review (L1)  │ /simplify        │ pass — simplified 2 functions                 │
+│ Review (L2)  │ code-reviewer    │ pass — no issues                              │
+│ Review (L3)  │ codex            │ skipped — command not found (user approved)   │
+│ Review (L4)  │ built-in         │ pass — tests green, health check 200          │
+└──────────────┴──────────────────┴───────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ ACCEPTANCE CRITERIA                                                             │
+├───┬─────────────────────────────────────────────────────────────────────────────┤
+│ ✅│ User can sign up with email/password                                        │
+│ ✅│ User can log in and receive a session token                                 │
+│ ✅│ Invalid credentials return 401                                              │
+└───┴─────────────────────────────────────────────────────────────────────────────┘
+
+KEY DECISIONS:
+  - Used bcrypt for password hashing (argon2 considered, bcrypt simpler for MVP)
+  - JWT tokens expire in 24h (configurable in env)
+
+NEXT UP: feat-002 — User profile settings
 ```
 
-Also include the compliance summary in the handoff JSONL entry under a `"compliance"` field:
+**Rules:**
+1. **Every section must be filled in.** If a spoke was not used, show it in the table with a reason (e.g., "not used — no parallelizable subtasks").
+2. **Spoke Usage table must show all 4 review layers**, even if some were skipped or disabled.
+3. **Acceptance Criteria must list ALL criteria** from the checklist with pass/fail status.
+4. **Key Decisions** — list any notable technical decisions, trade-offs, or surprises. If none, write "None — straightforward implementation."
+5. A **violation** is when a stage was skipped or substituted WITHOUT attempting the configured tool and WITHOUT user approval. Violations should be zero. If non-zero, explain in Key Decisions.
+
+Also include in the handoff JSONL entry:
 
 ```json
 "compliance": {
-  "total": 15,
-  "ok": 14,
+  "total": 13,
+  "ok": 12,
   "fallback": 0,
   "skipped": 1,
   "violations": 0
-}
+},
+"flow_summary": "Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: L1 OK, L2 OK, L3 skipped (user), L4 OK. 3/3 acceptance criteria met."
 ```
-
-A **violation** is when a stage was skipped or substituted WITHOUT attempting the configured tool and WITHOUT user approval. Violations should be zero. If non-zero, the handoff note must explain what happened.
 
 ---
 
@@ -319,4 +357,5 @@ These are failure modes observed in real sessions. If you catch yourself doing a
 | **Rationalized skip** | Agent says "X already covered this" to skip a layer | Each layer catches different things. Invoke it anyway. |
 | **Deferred handoff** | Agent implements + commits but forgets to update the handoff log | Handoff log is part of the commit loop, not an afterthought. |
 | **Stale handoff notes** | Handoff note contains outdated information from earlier in the session | Re-read your handoff note before writing it. Does it reflect the final state? |
-| **Missing compliance table** | Agent outputs "done" without the stage tracker | The compliance table is Step 9e. It is not optional. |
+| **Missing flow summary** | Agent outputs "done" without the session flow summary | The flow summary is Step 9e. It is not optional — it shows stage compliance, spoke usage, and acceptance criteria in one output. |
+| **Skipped planning** | Agent jumps straight to implementation without invoking the planning tool | Step 6 is required. Even for simple features, plan the approach first. |
