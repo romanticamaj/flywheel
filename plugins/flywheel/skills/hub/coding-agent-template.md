@@ -134,7 +134,7 @@ For each layer in `review.layers` (self-review, code-review, cross-model, e2e):
 1. Read the tool name from `review.tools[layer]`.
 2. If the tool is `null` → **skip** (layer explicitly disabled). Log as `"skipped (disabled)"`. Update tracker: Status = `✅ OK`.
 3. **Attempt the configured tool first:**
-   - Invoke it using the Skill tool (e.g., `superpowers:/simplify`, `gstack:/review`, `gstack:/codex`, `gstack:/qa`).
+   - Invoke it using the Skill tool (e.g., `superpowers:/simplify`, `gstack:/review`, `codex:review`, `gstack:/qa`).
    - If the tool succeeds → update tracker: Actual = tool name, Status = `✅ OK`.
 4. **If the configured tool fails:**
    - Log the actual error: update tracker: Actual = `"{tool} — {error message}"`.
@@ -152,9 +152,24 @@ For each layer in `review.layers` (self-review, code-review, cross-model, e2e):
 
 **Common rationalization traps (these are VIOLATIONS, not fallbacks):**
 - "The simplify agents already covered code review" → NO. `gstack:/review` must still be invoked.
-- "Codex is not installed so I'll skip cross-model" → NO. Attempt the invocation first; if it fails, ask the user.
+- "Codex plugin is not installed so I'll skip cross-model" → NO. Attempt the invocation first; if it fails, show install instructions and ask the user.
 - "The mock test covers E2E" → NO. `gstack:/qa` must be attempted first.
 - "I already found issues, so another review pass is redundant" → NO. Each layer catches different things.
+
+**Cross-model tool invocation guide:**
+
+| Configured tool | How to invoke | Fallback chain |
+|---|---|---|
+| `codex:review` | Skill tool: `/codex:review --wait` | → `gstack:/codex` → `gemini-cli` → skip (user approved) |
+| `codex:adversarial-review` | Skill tool: `/codex:adversarial-review --wait` | → `codex:review` → `gstack:/codex` → skip (user approved) |
+| `gstack:/codex` | Skill tool: `/codex` | → `codex:review` → `gemini-cli` → skip (user approved) |
+
+**When codex:review is configured but the plugin is not installed:**
+1. The Skill invocation will fail (command not found).
+2. Show the user: `"Cross-model review configured as codex:review but the codex plugin is not installed. Install: /plugin marketplace add openai/codex-plugin-cc && /plugin install codex. A) Install now, B) Try [next alternative], C) Skip this layer"`
+3. If user chooses A, guide them through install, then retry.
+4. If user chooses B, try the next alternative in `review.alternatives["cross-model"]`.
+5. If user chooses C, log as `❌ SKIPPED (user approved)`.
 
 ### 8b. Minimum Tier (Required)
 
@@ -171,7 +186,7 @@ Record which tool was used for each layer — this goes into the handoff entry (
 "review": {
   "self-review": "superpowers:/simplify",
   "code-review": "gstack:/review",
-  "cross-model": "gstack:/codex — command not found → skipped (user approved)",
+  "cross-model": "codex:review — plugin not installed → gstack:/codex (fallback)",
   "e2e": "gstack:/qa"
 }
 ```

@@ -18,7 +18,7 @@ Check the active Claude Code skills list for known skill names:
 | Multi-agent | `gstack` (Conductor commands), `superpowers` (dispatching-parallel-agents, subagent-driven-development) |
 | Review — self-review | `superpowers` (code-simplifier / /simplify) |
 | Review — code-review | `gstack` (/review), `superpowers` (code-reviewer) |
-| Review — cross-model | `gstack` (/codex) |
+| Review — cross-model | `codex` (codex:review, codex:adversarial-review), `gstack` (/codex) |
 | Review — E2E | `gstack` (/qa) |
 
 ### Step 2: Check node_modules for npm Packages
@@ -51,7 +51,7 @@ which playwright 2>/dev/null || where playwright 2>NUL
 | CLI tool | Maps to spoke |
 |---|---|
 | `gemini` | Review — cross-model |
-| `codex` | Review — cross-model |
+| `codex` | Review — cross-model (CLI fallback) |
 | `playwright` | Review — E2E |
 
 ### Step 4: Build Available-Tools Map
@@ -65,7 +65,7 @@ Merge results from Steps 1-3 into a single map:
   "review": {
     "self-review": ["superpowers:/simplify"],
     "code-review": ["gstack:/review", "superpowers:code-reviewer"],
-    "cross-model": ["gstack:/codex", "gemini-cli"],
+    "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
     "e2e": ["gstack:/qa", "playwright"]
   }
 }
@@ -167,10 +167,11 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 >
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
-> | 1 | ✅/⬜ | **gemini-cli** | Gemini CLI for second-opinion review | Install: `npm install -g @anthropic-ai/gemini-cli` or check if `gemini` is in PATH |
-> | 2 | ✅/⬜ | **gstack /codex** | OpenAI Codex CLI wrapper for adversarial review | Add gstack as plugin |
-> | 3 | ✅/⬜ | **codex-cli** | Codex CLI directly | Install: `npm install -g @openai/codex` or check if `codex` is in PATH |
-> | 4 | — | **Skip** | Disable this layer | — |
+> | 1 | ✅/⬜ | **codex:review** | Official OpenAI Codex plugin — standard + adversarial review modes, background jobs, stop gate | `/plugin marketplace add openai/codex-plugin-cc && /plugin install codex` |
+> | 2 | ✅/⬜ | **gstack /codex** | gstack Codex wrapper — simpler interface, adversarial challenge mode | Add gstack as plugin |
+> | 3 | ✅/⬜ | **gemini-cli** | Gemini CLI for second-opinion review | `npm install -g @google/gemini-cli` or check if `gemini` is in PATH |
+> | 4 | ✅/⬜ | **codex-cli** | Codex CLI directly (no plugin integration) | `npm install -g @openai/codex` |
+> | 5 | — | **Skip** | Disable this layer | — |
 
 #### Review — E2E
 
@@ -224,7 +225,7 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
     "alternatives": {
       "self-review": ["superpowers:/simplify"],
       "code-review": ["gstack:/review", "superpowers:code-reviewer"],
-      "cross-model": ["gstack:/codex", "gemini-cli"],
+      "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
       "e2e": ["gstack:/qa", "playwright"]
     }
   },

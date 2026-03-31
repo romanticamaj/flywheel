@@ -26,7 +26,7 @@ A 4-layer code review pipeline where each layer catches what the previous one mi
 |-------|---------|---------|---------------|
 | **1. Self-review** | Code hygiene, reuse, simplification | Dead code, duplication, unnecessary complexity | superpowers /simplify, manual review prompt |
 | **2. Code review** | Logic, bugs, security, conventions | Off-by-one, injection, race conditions, pattern violations | gstack /review, superpowers code-reviewer |
-| **3. Cross-model** | Blind spots of the authoring model | Systematic biases, assumptions the first model made | gstack /codex, Gemini CLI, any different LLM |
+| **3. Cross-model** | Blind spots of the authoring model | Systematic biases, assumptions the first model made | codex:review (plugin), gstack /codex, Gemini CLI |
 | **4. E2E verification** | Does it actually work? | Integration failures, UI broken, API contract violations | gstack /qa, Playwright, manual browser test |
 
 ## Tiers
@@ -72,7 +72,7 @@ Any step failure → report as critical issue.
 |-------|-------------|
 | Self-review | superpowers /simplify, built-in prompt |
 | Code review | gstack /review, superpowers code-reviewer, built-in prompt |
-| Cross-model | gstack /codex, Gemini CLI, any second LLM |
+| Cross-model | codex:review (plugin), codex:adversarial-review (plugin), gstack /codex, Gemini CLI |
 | E2E | gstack /qa, Playwright, built-in smoke test |
 
 ## Detection
@@ -83,6 +83,9 @@ How to detect each tool at runtime:
 |------|-----------------|
 | superpowers /simplify | `code-simplifier` in skills list |
 | gstack /review | `gstack review` in skills list |
+| codex:review (plugin) | `codex:review` in skills/commands list |
+| codex:adversarial-review (plugin) | `codex:adversarial-review` in skills/commands list |
 | gstack /codex | `gstack codex` in skills list |
+| codex CLI (direct) | `codex` command in PATH |
 | Playwright | `playwright` in `node_modules` or available via `npx` |
 | Gemini CLI | `gemini` command in PATH |
