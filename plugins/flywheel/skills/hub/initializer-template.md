@@ -4,9 +4,55 @@ This is a reference template for the Initializer phase of the flywheel protocol.
 
 ---
 
+## 0. Pre-Flight: Recommended Starter Pack
+
+**Run this BEFORE the detection algorithm.** New users often have no plugins installed, leading to a wall of ⬜ options and a hollow flywheel. This step gets them to 80% spoke coverage with just 1–2 installs.
+
+### Present the starter pack
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ RECOMMENDED STARTER PACK                                            │
+│                                                                     │
+│ Flywheel works best with these plugins. You can skip and use        │
+│ built-in defaults, but the review + planning quality will be lower. │
+├───┬──────────────┬──────────────────────────────────────────────────┤
+│ # │ Plugin       │ Covers                                           │
+├───┼──────────────┼──────────────────────────────────────────────────┤
+│ 1 │ superpowers  │ Planning, self-review, code review, multi-agent  │
+│ 2 │ codex        │ Cross-model review (requires OpenAI account)     │
+└───┴──────────────┴──────────────────────────────────────────────────┘
+
+  Install options:
+    1) superpowers only (recommended minimum)
+    2) superpowers + codex (full coverage)
+    3) Skip — I'll pick tools manually
+```
+
+### Execution flow
+
+1. **Check which are already installed** — scan the skills list for `superpowers` and `codex:review`. If both are present, skip this step entirely and proceed to detection.
+2. **Show only what's missing** — if superpowers is installed but codex is not, only offer codex. If both are missing, show the full menu above.
+3. **If user picks 1 or 2**, run the install commands and wait for completion:
+   ```
+   # superpowers
+   /plugin marketplace add anthropics/superpowers
+   /plugin install superpowers
+
+   # codex (if selected)
+   /plugin marketplace add openai/codex-plugin-cc
+   /plugin install codex
+   ```
+4. **After install, run `/reload-plugins`** to make new skills available for detection.
+5. **If user picks 3**, proceed directly to detection. The per-spoke menus will show install commands for individual tools.
+
+**Do NOT block on this step.** If the user wants to skip, let them. The per-spoke selection (Section 2) still shows all tools with install commands.
+
+---
+
 ## 1. Runtime Detection Algorithm
 
-Execute these 7 steps in order at Initializer startup.
+Execute these 7 steps in order at Initializer startup. (If the pre-flight installed plugins, their skills will now appear in detection.)
 
 ### Step 1: Scan Claude Code Skills List
 
