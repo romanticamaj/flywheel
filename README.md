@@ -81,7 +81,7 @@ The agent follows a **9-step loop**:
 Every session ends with a compliance table:
 
 ```
-SESSION COMPLIANCE — feat-001: Health endpoint
+SESSION FLOW SUMMARY — feat-001: Health endpoint
 ┌────┬──────────────────────┬──────────────┬──────────────────────────────────┬──────────┐
 │ #  │ Stage                │ Configured   │ Actual                           │ Status   │
 ├────┼──────────────────────┼──────────────┼──────────────────────────────────┼──────────┤
@@ -90,15 +90,15 @@ SESSION COMPLIANCE — feat-001: Health endpoint
 │ 3  │ Read checklist       │ —            │ feat-001 selected (priority 1)   │ ✅ OK    │
 │ 4  │ Bootstrap            │ init.sh      │ npm install                      │ ✅ OK    │
 │ 5  │ Smoke test           │ —            │ npm test + npm run build pass    │ ✅ OK    │
-│ 6  │ Plan                 │ built-in     │ Approach outlined                │ ✅ OK    │
-│ 7  │ Implement            │ —            │ /health with uptime + 5 tests    │ ✅ OK    │
-│ 8a │ Review: self-review  │ built-in     │ Manual diff review               │ ✅ OK    │
-│ 8b │ Review: code-review  │ built-in     │ Code reviewer subagent           │ ✅ OK    │
-│ 8c │ Review: cross-model  │ null         │ Skipped (disabled)               │ ✅ OK    │
-│ 8d │ Review: e2e          │ built-in     │ npm test + npm run build         │ ✅ OK    │
+│ 6  │ Plan                 │ plan-w-files │ task_plan.md created              │ ✅ OK    │
+│ 7  │ Implement            │ superpowers  │ /health with uptime + 5 tests    │ ✅ OK    │
+│ 8a │ Review: self-review  │ /simplify    │ superpowers:/simplify             │ ✅ OK    │
+│ 8b │ Review: code-review  │ code-reviewer│ superpowers code-reviewer (agent) │ ✅ OK    │
+│ 8c │ Review: cross-model  │ codex:review │ codex:review (OpenAI)             │ ✅ OK    │
+│ 8d │ Review: e2e          │ playwright   │ Playwright browser verification   │ ✅ OK    │
 │ 9  │ Commit + handoff     │ —            │ Committed + handoff written      │ ✅ OK    │
 └────┴──────────────────────┴──────────────┴──────────────────────────────────┴──────────┘
-RESULT: 15/15 stages OK
+RESULT: 13/13 stages OK
 ```
 
 ## Architecture
@@ -132,7 +132,50 @@ Each spoke is independent. All have a **built-in zero-dependency default** and o
 |-------|-----------------|----------------|
 | **Planning** | Claude generates `feature-checklist.json` directly | planning-with-files, OpenSpec, superpowers |
 | **Multi-Agent** | Claude Code `--worktree` + `Agent` tool | gstack Conductor, superpowers |
-| **Review** | Subagent code review + test suite smoke test | gstack, superpowers, Playwright, Gemini CLI |
+| **Review** | Subagent code review + test suite smoke test | gstack, superpowers, codex, Playwright, Gemini CLI |
+
+### Recommended stack
+
+The author's recommended configuration for maximum coverage:
+
+```
+┌──────────────────┬──────────────────────────┬──────────────────────────────────┐
+│ Spoke            │ Tool                     │ Why                              │
+├──────────────────┼──────────────────────────┼──────────────────────────────────┤
+│ Planning         │ planning-with-files      │ File-based plans with progress   │
+│ Multi-agent      │ superpowers              │ Parallel agent dispatch          │
+│ Self-review      │ superpowers /simplify    │ Author cleanup — dead code, etc  │
+│ Code review      │ superpowers code-reviewer│ Fresh Claude session as peer     │
+│ Cross-model      │ codex:review             │ Different model catches biases   │
+│ E2E              │ Playwright               │ Real browser verification        │
+└──────────────────┴──────────────────────────┴──────────────────────────────────┘
+```
+
+**Install the recommended stack:**
+
+```bash
+# 1. superpowers — multi-agent, self-review, code-review
+#    Source: https://github.com/obra/superpowers
+/plugin install superpowers@claude-plugins-official
+
+# 2. planning-with-files — file-based planning (task_plan.md, progress tracking)
+#    Source: https://github.com/OthmanAdi/planning-with-files
+npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
+
+# 3. codex — cross-model review (requires OpenAI/ChatGPT account)
+#    Source: https://github.com/openai/codex-plugin-cc
+/plugin marketplace add openai/codex-plugin-cc
+/plugin install codex@openai-codex
+/codex:setup
+
+# 4. playwright — real browser E2E verification (Claude Code plugin)
+#    Source: https://github.com/anthropics/claude-plugins-public/tree/main/external_plugins/playwright
+/plugin install playwright@claude-plugins-official
+```
+
+Then run `/flywheel:init` — the initializer will auto-detect all four and pre-select them.
+
+> **Minimal setup:** If you only install one thing, install **superpowers**. It covers multi-agent, self-review, and code-review. Add **planning-with-files** for auditable plan artifacts. Add **codex** for cross-model bias detection. Add **Playwright** for real browser E2E instead of smoke tests.
 
 ## The handoff log
 
@@ -204,7 +247,7 @@ Each layer catches what the previous one misses:
 |-------|---------|-------|
 | **1. Self-review** | Dead code, duplication, unnecessary complexity | superpowers /simplify |
 | **2. Code review** | Logic bugs, security issues, convention violations | gstack /review, superpowers code-reviewer |
-| **3. Cross-model** | Systematic biases of the authoring model | Gemini CLI, gstack /codex |
+| **3. Cross-model** | Systematic biases of the authoring model | **codex:review** (primary), gstack /codex, Gemini CLI |
 | **4. E2E** | Integration failures, broken UI, API contract violations | gstack /qa, Playwright |
 
 Minimum required: layers 2 + 4. All four recommended when tools are available.
@@ -219,21 +262,51 @@ Minimum required: layers 2 + 4. All four recommended when tools are available.
 | **Ask before skipping** | Agent can't silently skip review layers. |
 | **Compliance table required** | Every session ends with an accountability record. |
 
-## Testing
+## Feature management
 
-Run the E2E test suite against a mock project:
+Features are dynamic — add, revise, reprioritize, split, or remove them between relay sessions:
 
-```bash
-# Run all tests (init → relay → continuity)
-./tests/run-tests.sh
-
-# Run specific test
-./tests/run-tests.sh --test init
-./tests/run-tests.sh --test relay
-./tests/run-tests.sh --test continuity
+```
+/flywheel:features          # Add, revise, reprioritize, split, remove features
+/flywheel:features-list     # Read-only view with progress summary
 ```
 
-The tests invoke Claude Code in print mode against a mock Node.js project with three features, verifying that flywheel creates artifacts, follows the 9-step loop, and maintains session continuity across multiple invocations.
+## Testing
+
+The E2E test suite invokes `claude -p` against a mock Node.js project, validating artifacts, schemas, and behavior at each flywheel stage.
+
+```bash
+# Run all 10 tests (~31 assertions)
+./tests/run-tests.sh --test all
+
+# Run by phase
+./tests/run-tests.sh --test init              # Initializer artifacts
+./tests/run-tests.sh --test relay             # 9-step coding agent loop
+./tests/run-tests.sh --test continuity        # Multi-session handoff
+./tests/run-tests.sh --test features          # Add, revise, split, remove, integrity
+./tests/run-tests.sh --test features-list     # Read-only display
+
+# Run individual feature tests
+./tests/run-tests.sh --test features-add
+./tests/run-tests.sh --test features-revise
+./tests/run-tests.sh --test features-split
+./tests/run-tests.sh --test features-remove
+```
+
+| Test | Validates |
+|------|-----------|
+| **1. Init** | `.flywheel/` directory, config schema, checklist schema, init scripts, git commit |
+| **2. Relay** | Handoff log, JSONL schema, checklist update, feature commit, compliance output |
+| **3. Continuity** | Handoff growth, different feature picked, no duplicate work |
+| **4. Features Add** | Count increased, unique IDs, valid schema, correct titles |
+| **5. Features Revise** | Criteria expanded, other features untouched, count stable |
+| **6. Features Split** | Parent marked split, sub-features valid, no duplicate IDs |
+| **7. Features Remove** | Target gone, schema intact, IDs not renumbered, valid JSON |
+| **8. Source Metadata** | Config source field preserved through all operations |
+| **9. Integrity** | Full checklist validation: version, types, statuses, constraints |
+| **10. Features List** | Output contains IDs/titles/statuses, read-only verified |
+
+**Requirements:** `claude` CLI (authenticated), `python3`, `git`. Each test call costs ~$0.30–$1.00 (Sonnet, $1.00 cap).
 
 ## Compared to alternatives
 

@@ -6,45 +6,182 @@ This is a reference template for the Initializer phase of the flywheel protocol.
 
 ## 0. Pre-Flight: Recommended Starter Pack
 
-**Run this BEFORE the detection algorithm.** New users often have no plugins installed, leading to a wall of ⬜ options and a hollow flywheel. This step gets them to 80% spoke coverage with just 1–2 installs.
+**Run this BEFORE the detection algorithm.** New users often have no plugins installed, leading to a wall of ⬜ options and a hollow flywheel. This step detects what's missing and guides the user through installing each tool one at a time.
 
-### Present the starter pack
+### Step 0a: Detect what's installed
+
+Run these checks silently (do not show commands to user):
+
+```bash
+# Check superpowers — look for skill names in Claude Code skills list
+# Present: if any of these skills exist: "superpowers:brainstorming", "superpowers:writing-plans",
+#          "superpowers:dispatching-parallel-agents", "simplify"
+
+# Check planning-with-files — look for skill name in Claude Code skills list
+# Present: if "planning-with-files" skill exists
+
+# Check codex — look for skill/command names in Claude Code skills/commands list
+# Present: if "codex:setup" or "codex:rescue" skill exists
+
+# Check playwright — look for MCP tools or skill names in Claude Code
+# Present: if any mcp__plugin_playwright_playwright__* tools exist,
+#          or "playwright" appears in the skills/plugins list
+```
+
+### Step 0b: Show the status board
+
+Present a single status board showing what's installed and what's missing:
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│ RECOMMENDED STARTER PACK                                            │
-│                                                                     │
-│ Flywheel works best with these plugins. You can skip and use        │
-│ built-in defaults, but the review + planning quality will be lower. │
-├───┬──────────────┬──────────────────────────────────────────────────┤
-│ # │ Plugin       │ Covers                                           │
-├───┼──────────────┼──────────────────────────────────────────────────┤
-│ 1 │ superpowers  │ Planning, self-review, code review, multi-agent  │
-│ 2 │ codex        │ Cross-model review (requires OpenAI account)     │
-└───┴──────────────┴──────────────────────────────────────────────────┘
+RECOMMENDED TOOLS — status
+┌───┬──────────────────┬──────────────────────────────────┬───────────┐
+│ # │ Tool             │ Covers                           │ Status    │
+├───┼──────────────────┼──────────────────────────────────┼───────────┤
+│ 1 │ superpowers      │ Self-review, code review,        │ ✅ / ⬜   │
+│   │                  │ multi-agent                      │           │
+│ 2 │ planning-w-files │ File-based planning              │ ✅ / ⬜   │
+│   │                  │ (task_plan.md, progress)          │           │
+│ 3 │ codex            │ Cross-model review               │ ✅ / ⬜   │
+│   │                  │ (requires OpenAI/ChatGPT)        │           │
+│ 4 │ Playwright       │ Real browser E2E verification    │ ✅ / ⬜   │
+└───┴──────────────────┴──────────────────────────────────┴───────────┘
+```
 
+- **✅** = detected, no action needed
+- **⬜** = not installed
+
+**If all 4 are ✅:** Say "All recommended tools installed!" and proceed to Section 1 (detection).
+
+**If any are ⬜:** Show install options:
+
+```
   Install options:
-    1) superpowers only (recommended minimum)
-    2) superpowers + codex (full coverage)
-    3) Skip — I'll pick tools manually
+    1) Install all missing tools (recommended)
+    2) Pick which to install
+    3) Skip — use built-in defaults
 ```
 
-### Execution flow
+### Step 0c: Guided installation
 
-1. **Check which are already installed** — scan the skills list for `superpowers` and `codex:review`. If both are present, skip this step entirely and proceed to detection.
-2. **Show only what's missing** — if superpowers is installed but codex is not, only offer codex. If both are missing, show the full menu above.
-3. **If user picks 1 or 2**, run the install commands and wait for completion:
-   ```
-   # superpowers
-   /plugin marketplace add anthropics/superpowers
-   /plugin install superpowers
+**If user picks 1 (install all)** or **picks 2 (selective)**, walk through each missing tool one at a time in this order. For each tool:
 
-   # codex (if selected)
-   /plugin marketplace add openai/codex-plugin-cc
-   /plugin install codex
-   ```
-4. **After install, run `/reload-plugins`** to make new skills available for detection.
-5. **If user picks 3**, proceed directly to detection. The per-spoke menus will show install commands for individual tools.
+1. Show what it does and why
+2. Run the install command
+3. Verify it worked
+4. Show ✅ and move to the next
+
+#### Tool 1: superpowers
+
+```
+Installing superpowers — covers self-review, code review, and multi-agent dispatch...
+Source: https://github.com/obra/superpowers
+```
+
+**Install:**
+```
+/plugin install superpowers@claude-plugins-official
+```
+
+**Verify:** Check that `superpowers:brainstorming` or `simplify` now appears in the skills list after `/reload-plugins`.
+
+**If install fails:** Show the error and offer alternatives:
+```
+superpowers install failed: [error]
+  A) Retry
+  B) Skip — self-review and code-review will use built-in defaults
+```
+
+#### Tool 2: planning-with-files
+
+```
+Installing planning-with-files — file-based planning with task_plan.md and progress tracking...
+Source: https://github.com/OthmanAdi/planning-with-files
+```
+
+**Install:**
+```bash
+npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
+```
+
+**Verify:** Check that `planning-with-files` now appears in the skills list after `/reload-plugins`.
+
+**If install fails:** Show the error and offer alternatives:
+```
+planning-with-files install failed: [error]
+  A) Retry
+  B) Try alternative: /plugin marketplace add OthmanAdi/planning-with-files && /plugin install planning-with-files@planning-with-files
+  C) Skip — planning will use built-in default
+```
+
+#### Tool 3: codex
+
+```
+Installing codex — cross-model review using OpenAI's Codex (catches Claude's blind spots)...
+Source: https://github.com/openai/codex-plugin-cc
+Requires: OpenAI API key or ChatGPT account
+```
+
+**Install (2 steps + verify):**
+```
+/plugin marketplace add openai/codex-plugin-cc
+/plugin install codex@openai-codex
+```
+
+**Verify:** Run `/codex:setup` to confirm the Codex CLI is installed and authenticated. If the CLI is missing, `/codex:setup` will offer to install it via `npm install -g @openai/codex`.
+
+**Verify:** Check that `codex:setup` or `codex:rescue` now appears in the skills list.
+
+**If user doesn't have an OpenAI account:** Say:
+```
+Codex requires an OpenAI/ChatGPT account. You can:
+  A) Sign up at https://platform.openai.com and continue
+  B) Skip — cross-model review will be disabled (you can add it later)
+```
+
+#### Tool 4: Playwright
+
+```
+Installing Playwright — real browser automation for E2E verification...
+Source: https://github.com/anthropics/claude-plugins-public/tree/main/external_plugins/playwright
+```
+
+**Install:**
+```
+/plugin install playwright@claude-plugins-official
+```
+
+**Verify:** Check that `mcp__plugin_playwright_playwright__browser_navigate` or similar Playwright MCP tools appear after `/reload-plugins`.
+
+**If install fails:** Show the error and offer alternatives:
+```
+Playwright install failed: [error]
+  A) Retry
+  B) Skip — E2E will use built-in smoke test (test suite + health check)
+```
+
+### Step 0d: Final status
+
+After all installations, show the updated status board:
+
+```
+RECOMMENDED TOOLS — final status
+┌───┬──────────────────┬───────────┐
+│ # │ Tool             │ Status    │
+├───┼──────────────────┼───────────┤
+│ 1 │ superpowers      │ ✅        │
+│ 2 │ planning-w-files │ ✅        │
+│ 3 │ codex            │ ✅        │
+│ 4 │ Playwright       │ ⬜ skipped│
+└───┴──────────────────┴───────────┘
+
+3/4 tools installed. Proceeding to detection...
+```
+
+Run `/reload-plugins` once to make all newly installed skills available, then proceed to Section 1 (detection).
+
+### Step 0e: Skip path
+
+**If user picks 3 (skip):** Say "Using built-in defaults. You can install tools later and re-run `/flywheel:init`." Proceed directly to Section 1.
 
 **Do NOT block on this step.** If the user wants to skip, let them. The per-spoke selection (Section 2) still shows all tools with install commands.
 
@@ -65,7 +202,7 @@ Check the active Claude Code skills list for known skill names:
 | Review — self-review | `superpowers` (code-simplifier / /simplify) |
 | Review — code-review | `gstack` (/review), `superpowers` (code-reviewer) |
 | Review — cross-model | `codex` (codex:review, codex:adversarial-review), `gstack` (/codex) |
-| Review — E2E | `gstack` (/qa) |
+| Review — E2E | `gstack` (/qa), `playwright` (MCP tools: `mcp__plugin_playwright_playwright__*`) |
 
 ### Step 2: Check node_modules for npm Packages
 
@@ -74,31 +211,28 @@ Search both local and global installations:
 ```
 # Local
 ls node_modules/openspec 2>/dev/null
-ls node_modules/playwright 2>/dev/null
 
 # Global
 npm list -g openspec --depth=0 2>/dev/null
-npm list -g playwright --depth=0 2>/dev/null
 ```
 
 | Package | Maps to spoke |
 |---|---|
 | `openspec` | Planning |
-| `playwright` | Review — E2E |
 
 ### Step 3: Check PATH for CLI Tools
 
 ```
 which gemini 2>/dev/null || where gemini 2>NUL
 which codex 2>/dev/null || where codex 2>NUL
-which playwright 2>/dev/null || where playwright 2>NUL
 ```
 
 | CLI tool | Maps to spoke |
 |---|---|
 | `gemini` | Review — cross-model |
 | `codex` | Review — cross-model (CLI fallback) |
-| `playwright` | Review — E2E |
+
+> **Note:** Playwright is now a Claude Code plugin (not an npm package). It is detected in Step 1 via MCP tool names (`mcp__plugin_playwright_playwright__*`).
 
 ### Step 4: Build Available-Tools Map
 
@@ -173,7 +307,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
 > | 1 | ✅/⬜ | **planning-with-files** | File-based planning with task_plan.md, findings.md, progress.md | `npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g` |
-> | 2 | ✅/⬜ | **superpowers** | Brainstorming + writing-plans skills | Already a Claude Code plugin — install via `/plugin install superpowers` |
+> | 2 | ✅/⬜ | **superpowers** | Brainstorming + writing-plans skills | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
 > | 3 | ✅/⬜ | **OpenSpec** | Structured proposal.md + specs/ directory | `npm install -g openspec` |
 > | 4 | ✅ | **built-in** | Claude generates feature-checklist.json directly, no dependencies | Always available |
 
@@ -184,7 +318,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
 > | 1 | ✅/⬜ | **gstack** | Conductor for parallel sprints + /plan-ceo-review, /plan-eng-review, /review, /qa, /ship | `git clone` gstack repo, add as plugin |
-> | 2 | ✅/⬜ | **superpowers** | dispatching-parallel-agents, subagent-driven-development | Already a Claude Code plugin — install via `/plugin install superpowers` |
+> | 2 | ✅/⬜ | **superpowers** | dispatching-parallel-agents, subagent-driven-development | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
 > | 3 | ✅ | **claude-code-native** | Built-in `--worktree` isolation + `Agent` tool, no dependencies | Always available |
 
 #### Review — Self-review
@@ -193,7 +327,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 >
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
-> | 1 | ✅/⬜ | **superpowers /simplify** | Code simplifier agent | Already a Claude Code plugin — install via `/plugin install superpowers` |
+> | 1 | ✅/⬜ | **superpowers /simplify** | Code simplifier agent | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
 > | 2 | ✅/⬜ | **gstack /simplify** | gstack code simplifier | Add gstack as plugin |
 > | 3 | ✅ | **built-in** | Manual diff review prompt | Always available |
 
@@ -204,7 +338,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
 > | 1 | ✅/⬜ | **gstack /review** | Pre-landing PR review with SQL safety, trust boundary analysis | Add gstack as plugin |
-> | 2 | ✅/⬜ | **superpowers code-reviewer** | Code reviewer subagent | Already a Claude Code plugin — install via `/plugin install superpowers` |
+> | 2 | ✅/⬜ | **superpowers code-reviewer** | Code reviewer subagent | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
 > | 3 | ✅ | **built-in** | Spawn a code-reviewer subagent with built-in prompt | Always available |
 
 #### Review — Cross-model
@@ -213,7 +347,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 >
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
-> | 1 | ✅/⬜ | **codex:review** | Official OpenAI Codex plugin — standard + adversarial review modes, background jobs, stop gate | `/plugin marketplace add openai/codex-plugin-cc && /plugin install codex` |
+> | 1 | ✅/⬜ | **codex:review** | Official OpenAI Codex plugin — standard + adversarial review modes, background jobs, stop gate | `/plugin marketplace add openai/codex-plugin-cc && /plugin install codex@openai-codex` |
 > | 2 | ✅/⬜ | **gstack /codex** | gstack Codex wrapper — simpler interface, adversarial challenge mode | Add gstack as plugin |
 > | 3 | ✅/⬜ | **gemini-cli** | Gemini CLI for second-opinion review | `npm install -g @google/gemini-cli` or check if `gemini` is in PATH |
 > | 4 | ✅/⬜ | **codex-cli** | Codex CLI directly (no plugin integration) | `npm install -g @openai/codex` |
@@ -226,7 +360,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
 > | 1 | ✅/⬜ | **gstack /qa** | Systematic QA testing with headless browser, finds + fixes bugs | Add gstack as plugin |
-> | 2 | ✅/⬜ | **Playwright** | Browser automation for E2E tests | `npm install playwright` |
+> | 2 | ✅/⬜ | **Playwright** | Browser automation for E2E tests (Claude Code plugin with MCP tools) | `/plugin install playwright@claude-plugins-official` |
 > | 3 | ✅ | **built-in** | Run init script + test suite + health check | Always available |
 
 ### Install-on-demand flow
@@ -274,6 +408,12 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
       "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
       "e2e": ["gstack:/qa", "playwright"]
     }
+  },
+  "source": {
+    "type": "user-input",
+    "paths": [],
+    "user_notes": null,
+    "resolved_at": "2026-03-27T00:00:00Z"
   },
   "scope_rule": "one-feature-per-session",
   "exit_rule": "merge-ready",
@@ -393,7 +533,7 @@ Each feature entry follows this schema:
 }
 ```
 
-Valid `status` values: `pending`, `in-progress`, `completed`, `blocked`.
+Valid `status` values: `pending`, `in-progress`, `completed`, `blocked`, `split`.
 
 ### `.flywheel/init.sh` and `.flywheel/init.ps1`
 

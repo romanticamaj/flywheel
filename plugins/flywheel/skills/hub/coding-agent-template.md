@@ -166,7 +166,7 @@ For each layer in `review.layers` (self-review, code-review, cross-model, e2e):
 
 **When codex:review is configured but the plugin is not installed:**
 1. The Skill invocation will fail (command not found).
-2. Show the user: `"Cross-model review configured as codex:review but the codex plugin is not installed. Install: /plugin marketplace add openai/codex-plugin-cc && /plugin install codex. A) Install now, B) Try [next alternative], C) Skip this layer"`
+2. Show the user: `"Cross-model review configured as codex:review but the codex plugin is not installed. Install: /plugin marketplace add openai/codex-plugin-cc && /plugin install codex@openai-codex. A) Install now, B) Try [next alternative], C) Skip this layer"`
 3. If user chooses A, guide them through install, then retry.
 4. If user chooses B, try the next alternative in `review.alternatives["cross-model"]`.
 5. If user chooses C, log as `❌ SKIPPED (user approved)`.
