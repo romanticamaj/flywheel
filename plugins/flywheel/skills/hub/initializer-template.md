@@ -201,7 +201,7 @@ Check the active Claude Code skills list for known skill names:
 | Multi-agent | `gstack` (Conductor commands), `superpowers` (dispatching-parallel-agents, subagent-driven-development) |
 | Review — self-review | `superpowers` (code-simplifier / /simplify) |
 | Review — code-review | `gstack` (/review), `superpowers` (code-reviewer) |
-| Review — cross-model | `codex` (codex:review, codex:adversarial-review), `gstack` (/codex) |
+| Review — cross-model | `codex:review` or `codex:rescue` (codex-plugin-cc — **primary**), `gstack` (/codex) |
 | Review — E2E | `gstack` (/qa), `playwright` (MCP tools: `mcp__plugin_playwright_playwright__*`) |
 
 ### Step 2: Check node_modules for npm Packages
@@ -227,10 +227,10 @@ which gemini 2>/dev/null || where gemini 2>NUL
 which codex 2>/dev/null || where codex 2>NUL
 ```
 
-| CLI tool | Maps to spoke |
-|---|---|
-| `gemini` | Review — cross-model |
-| `codex` | Review — cross-model (CLI fallback) |
+| CLI tool | Maps to spoke | Note |
+|---|---|---|
+| `gemini` | Review — cross-model | Gemini CLI |
+| `codex` | Review — cross-model | **Only use as fallback.** If `codex:review` or `codex:rescue` skills were detected in Step 1, the codex-plugin-cc is installed — prefer `codex:review` over bare CLI. Only map to `codex-cli` if the plugin skills are NOT detected. |
 
 > **Note:** Playwright is now a Claude Code plugin (not an npm package). It is detected in Step 1 via MCP tool names (`mcp__plugin_playwright_playwright__*`).
 
@@ -252,6 +252,8 @@ Merge results from Steps 1-3 into a single map:
 ```
 
 Only include tools that were actually detected. `claude-code-native` is always present for multi-agent.
+
+**Cross-model priority rule:** If `codex:review` or `codex:rescue` skills are detected (Step 1), list `codex:review` in the map — this is the codex-plugin-cc and is the **primary recommended** cross-model tool. Only list `codex-cli` if the plugin skills are NOT detected but the `codex` binary is in PATH (Step 3). Never list both — the plugin supersedes the bare CLI.
 
 ### Step 5: Present Findings and Prompt User
 

@@ -24,6 +24,16 @@ AI coding agents burn through their context window on large projects. The usual 
 2. **Merge-ready or revert.** No WIP commits. Every session leaves the codebase clean.
 3. **Machine-readable handoff.** The next session knows exactly what happened and what's next.
 
+### Benefits
+
+- **Zero-context-loss handoffs.** Session dies mid-project? No problem. The machine-readable handoff log tells the next session exactly what was done, what failed, and what's next. No manual briefing needed.
+- **Stateless sessions, persistent progress.** Once the feature checklist exists, every session is disposable. Open, close, crash — it doesn't matter. The next session reads the checklist, picks up the next pending feature, and keeps going.
+- **Scope discipline prevents context blowout.** One feature per session. AI agents love to scope-creep until they burn through the context window and produce half-finished work. Flywheel enforces focus: implement one thing, review it, commit merge-ready code, move on.
+- **4-layer review catches what single-model can't.** Self-review (cleanup) → Code review (fresh agent) → Cross-model (different AI catches blind spots) → E2E (real verification). Each layer catches what the previous one misses.
+- **Dynamic feature management between sessions.** Add, revise, reprioritize, split, or remove features at any time with `/flywheel:features`. The project plan evolves with you — no need to re-initialize or restart.
+- **Pluggable, not locked-in.** Every spoke (planning, multi-agent, review) has a zero-dependency built-in default. Install superpowers, codex, playwright as you need them. Works with one tool or all four.
+- **Auditable by design.** Every session ends with a compliance table showing exactly what ran, what was skipped, and why. The handoff log is a complete audit trail of every feature implemented across the project.
+
 ## Quick start
 
 ### Install
