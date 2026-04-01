@@ -319,7 +319,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 >
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
-> | 1 | ✅/⬜ | **gstack** | Conductor for parallel sprints + /plan-ceo-review, /plan-eng-review, /review, /qa, /ship | `git clone https://github.com/garrytan/gstack.git ~/.claude/plugins/gstack` |
+> | 1 | ✅/⬜ | **gstack** | Conductor for parallel sprints + /plan-ceo-review, /plan-eng-review, /review, /qa, /ship | Add gstack as plugin — see https://github.com/garrytan/gstack |
 > | 2 | ✅/⬜ | **superpowers** | dispatching-parallel-agents, subagent-driven-development | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
 > | 3 | ✅ | **claude-code-native** | Built-in `--worktree` isolation + `Agent` tool, no dependencies | Always available |
 
@@ -330,7 +330,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
 > | 1 | ✅/⬜ | **superpowers /simplify** | Code simplifier agent | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
-> | 2 | ✅/⬜ | **gstack /simplify** | gstack code simplifier | `git clone https://github.com/garrytan/gstack.git ~/.claude/plugins/gstack && claude --plugin-dir ~/.claude/plugins/gstack` |
+> | 2 | ✅/⬜ | **gstack /simplify** | gstack code simplifier | Add gstack as plugin — see https://github.com/garrytan/gstack |
 > | 3 | ✅ | **built-in** | Manual diff review prompt | Always available |
 
 #### Review — Code review
@@ -339,7 +339,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 >
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
-> | 1 | ✅/⬜ | **gstack /review** | Pre-landing PR review with SQL safety, trust boundary analysis | `git clone https://github.com/garrytan/gstack.git ~/.claude/plugins/gstack && claude --plugin-dir ~/.claude/plugins/gstack` |
+> | 1 | ✅/⬜ | **gstack /review** | Pre-landing PR review with SQL safety, trust boundary analysis | Add gstack as plugin — see https://github.com/garrytan/gstack |
 > | 2 | ✅/⬜ | **superpowers code-reviewer** | Code reviewer subagent | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
 > | 3 | ✅ | **built-in** | Spawn a code-reviewer subagent with built-in prompt | Always available |
 
@@ -350,7 +350,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
 > | 1 | ✅/⬜ | **codex:review** | Official OpenAI Codex plugin — standard + adversarial review modes, background jobs, stop gate | `/plugin marketplace add openai/codex-plugin-cc && /plugin install codex@openai-codex` |
-> | 2 | ✅/⬜ | **gstack /codex** | gstack Codex wrapper — simpler interface, adversarial challenge mode | `git clone https://github.com/garrytan/gstack.git ~/.claude/plugins/gstack && claude --plugin-dir ~/.claude/plugins/gstack` |
+> | 2 | ✅/⬜ | **gstack /codex** | gstack Codex wrapper — simpler interface, adversarial challenge mode | Add gstack as plugin — see https://github.com/garrytan/gstack |
 > | 3 | ✅/⬜ | **gemini-cli** | Gemini CLI for second-opinion review | `npm install -g @google/gemini-cli` or check if `gemini` is in PATH |
 > | 4 | ✅/⬜ | **codex-cli** | Codex CLI directly (no plugin integration) | `npm install -g @openai/codex` |
 > | 5 | — | **Skip** | Disable this layer | — |
@@ -361,7 +361,7 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 >
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
-> | 1 | ✅/⬜ | **gstack /qa** | Systematic QA testing with headless browser, finds + fixes bugs | `git clone https://github.com/garrytan/gstack.git ~/.claude/plugins/gstack && claude --plugin-dir ~/.claude/plugins/gstack` |
+> | 1 | ✅/⬜ | **gstack /qa** | Systematic QA testing with headless browser, finds + fixes bugs | Add gstack as plugin — see https://github.com/garrytan/gstack |
 > | 2 | ✅/⬜ | **Playwright** | Browser automation for E2E tests (Claude Code plugin with MCP tools) | `/plugin install playwright@claude-plugins-official` |
 > | 3 | ✅ | **built-in** | Run init script + test suite + health check | Always available |
 
@@ -369,10 +369,23 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 
 If the user picks a tool marked ⬜ (not installed):
 
-1. Show the install command.
-2. Ask: "Want me to install it now, or proceed with a different option?"
-3. If yes — run the install command, verify it worked, then continue.
-4. If no — ask them to pick another option.
+1. **Web fetch the tool's repo/docs for the latest install instructions.** Do not rely on hardcoded commands — install steps change over time. Fetch the README or install guide from the tool's source URL listed in the catalog table above.
+2. Show the install steps from the fetched guide.
+3. Ask: "Want me to install it now, or proceed with a different option?"
+4. If yes — run the install steps, verify it worked, then continue.
+5. If no — ask them to pick another option.
+
+**Tool source URLs for install guides:**
+
+| Tool | Source URL |
+|------|-----------|
+| superpowers | https://github.com/obra/superpowers |
+| planning-with-files | https://github.com/OthmanAdi/planning-with-files |
+| codex (codex-plugin-cc) | https://github.com/openai/codex-plugin-cc |
+| playwright | https://github.com/anthropics/claude-plugins-public/tree/main/external_plugins/playwright |
+| gstack | https://github.com/garrytan/gstack |
+| OpenSpec | https://github.com/openspec/openspec |
+| Gemini CLI | https://github.com/google/gemini-cli |
 
 Do NOT silently skip uninstalled tools or auto-fallback to built-in.
 
