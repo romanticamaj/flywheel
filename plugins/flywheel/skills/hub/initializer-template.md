@@ -37,7 +37,7 @@ RECOMMENDED TOOLS — status
 ┌───┬──────────────────┬──────────────────────────────────┬───────────┐
 │ # │ Tool             │ Covers                           │ Status    │
 ├───┼──────────────────┼──────────────────────────────────┼───────────┤
-│ 1 │ superpowers      │ Self-review, code review,        │ ✅ / ⬜   │
+│ 1 │ superpowers      │ Cleanup, peer review,            │ ✅ / ⬜   │
 │   │                  │ multi-agent                      │           │
 │ 2 │ planning-w-files │ File-based planning              │ ✅ / ⬜   │
 │   │                  │ (task_plan.md, progress)          │           │
@@ -73,7 +73,7 @@ RECOMMENDED TOOLS — status
 #### Tool 1: superpowers
 
 ```
-Installing superpowers — covers self-review, code review, and multi-agent dispatch...
+Installing superpowers — covers cleanup, peer review, and multi-agent dispatch...
 Source: https://github.com/obra/superpowers
 ```
 
@@ -88,7 +88,7 @@ Source: https://github.com/obra/superpowers
 ```
 superpowers install failed: [error]
   A) Retry
-  B) Skip — self-review and code-review will use built-in defaults
+  B) Skip — cleanup and peer-review will use built-in defaults
 ```
 
 #### Tool 2: planning-with-files
@@ -199,8 +199,8 @@ Check the active Claude Code skills list for known skill names:
 |---|---|
 | Planning | `planning-with-files`, `superpowers` (brainstorming / writing-plans) |
 | Multi-agent | `gstack` (Conductor commands), `superpowers` (dispatching-parallel-agents, subagent-driven-development) |
-| Review — self-review | `superpowers` (code-simplifier / /simplify) |
-| Review — code-review | `gstack` (/review), `superpowers` (code-reviewer) |
+| Review — cleanup | `superpowers` (code-simplifier / /simplify) |
+| Review — peer-review | `gstack` (/review), `superpowers` (peer-reviewer) |
 | Review — cross-model | `codex:review` or `codex:rescue` (codex-plugin-cc — **primary**), `gstack` (/codex) |
 | Review — E2E | `gstack` (/qa), `playwright` (MCP tools: `mcp__plugin_playwright_playwright__*`) |
 
@@ -243,8 +243,8 @@ Merge results from Steps 1-3 into a single map:
   "planning": ["planning-with-files", "openspec", "superpowers"],
   "multi_agent": ["gstack", "superpowers", "claude-code-native"],
   "review": {
-    "self-review": ["superpowers:/simplify"],
-    "code-review": ["gstack:/review", "superpowers:code-reviewer"],
+    "cleanup": ["superpowers:/simplify"],
+    "peer-review": ["gstack:/review", "superpowers:peer-reviewer"],
     "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
     "e2e": ["gstack:/qa", "playwright"]
   }
@@ -323,9 +323,9 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 > | 2 | ✅/⬜ | **superpowers** | dispatching-parallel-agents, subagent-driven-development | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
 > | 3 | ✅ | **claude-code-native** | Built-in `--worktree` isolation + `Agent` tool, no dependencies | Always available |
 
-#### Review — Self-review
+#### Review — Cleanup
 
-> **Self-review** — catches dead code, duplication, unnecessary complexity.
+> **Cleanup** — catches dead code, duplication, unnecessary complexity.
 >
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
@@ -333,15 +333,15 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 > | 2 | ✅/⬜ | **gstack /simplify** | gstack code simplifier | Add gstack as plugin — see https://github.com/garrytan/gstack |
 > | 3 | ✅ | **built-in** | Manual diff review prompt | Always available |
 
-#### Review — Code review
+#### Review — Peer review
 
-> **Code review** — catches logic bugs, security issues, convention violations.
+> **Peer review** — catches logic bugs, security issues, convention violations.
 >
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
 > | 1 | ✅/⬜ | **gstack /review** | Pre-landing PR review with SQL safety, trust boundary analysis | Add gstack as plugin — see https://github.com/garrytan/gstack |
-> | 2 | ✅/⬜ | **superpowers code-reviewer** | Code reviewer subagent | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
-> | 3 | ✅ | **built-in** | Spawn a code-reviewer subagent with built-in prompt | Always available |
+> | 2 | ✅/⬜ | **superpowers peer-reviewer** | Peer reviewer subagent | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
+> | 3 | ✅ | **built-in** | Spawn a peer-reviewer subagent with built-in prompt | Always available |
 
 #### Review — Cross-model
 
@@ -409,19 +409,40 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
     "tool": "claude-code-native",
     "alternatives": ["gstack", "superpowers"]
   },
+  "profile": {
+    "default": "adaptive",
+    "adaptive_rules": {
+      "1-2": "full",
+      "3-5": "standard",
+      "6+": "light"
+    },
+    "bump_rules": {
+      "first_feature": "full",
+      "security_sensitive": "full",
+      "has_dependencies": "+1 tier",
+      "was_blocked": "full",
+      "has_cross_model_tool": "+1 tier"
+    }
+  },
   "review": {
-    "layers": ["self-review", "code-review", "cross-model", "e2e"],
+    "layers": ["cleanup", "peer-review", "cross-model", "e2e"],
     "tools": {
-      "self-review": "built-in",
-      "code-review": "built-in",
+      "cleanup": "built-in",
+      "peer-review": "built-in",
       "cross-model": null,
       "e2e": "built-in"
     },
     "alternatives": {
-      "self-review": ["superpowers:/simplify"],
-      "code-review": ["gstack:/review", "superpowers:code-reviewer"],
+      "cleanup": ["superpowers:/simplify"],
+      "peer-review": ["gstack:/review", "superpowers:peer-reviewer"],
       "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
       "e2e": ["gstack:/qa", "playwright"]
+    },
+    "profiles": {
+      "full":     { "cleanup": true,  "peer-review": "full",    "cross-model": true,  "e2e": true  },
+      "standard": { "cleanup": false, "peer-review": "top5",    "cross-model": false, "e2e": true  },
+      "light":    { "cleanup": false, "peer-review": "verdict", "cross-model": false, "e2e": false },
+      "draft":    { "cleanup": false, "peer-review": false,     "cross-model": false, "e2e": false }
     }
   },
   "source": {
@@ -444,9 +465,13 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
 | `planning.alternatives` | string[] | All known planning tools |
 | `multi_agent.tool` | string | User's chosen tool or `"claude-code-native"` |
 | `multi_agent.alternatives` | string[] | All known multi-agent tools |
-| `review.layers` | string[] | Fixed: `["self-review", "code-review", "cross-model", "e2e"]` |
+| `profile.default` | string | `"adaptive"`, `"full"`, `"standard"`, `"light"`, or `"draft"` |
+| `profile.adaptive_rules` | object | Maps feature priority ranges to profiles |
+| `profile.bump_rules` | object | Conditions that override the adaptive selection |
+| `review.layers` | string[] | Fixed: `["cleanup", "peer-review", "cross-model", "e2e"]` |
 | `review.tools` | object | Per-layer tool choice; `null` means layer is skipped |
 | `review.alternatives` | object | Per-layer list of known tools |
+| `review.profiles` | object | Per-profile layer config: `true`/`false`/`"full"`/`"top5"`/`"verdict"` |
 | `scope_rule` | string | `"one-feature-per-session"` |
 | `exit_rule` | string | `"merge-ready"` |
 | `branch_naming` | string | Template with `{id}` and `{slug}` placeholders |

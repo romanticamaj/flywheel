@@ -29,7 +29,7 @@ AI coding agents burn through their context window on large projects. The usual 
 - **Zero-context-loss handoffs.** Session dies mid-project? No problem. The machine-readable handoff log tells the next session exactly what was done, what failed, and what's next. No manual briefing needed.
 - **Stateless sessions, persistent progress.** Once the feature checklist exists, every session is disposable. Open, close, crash — it doesn't matter. The next session reads the checklist, picks up the next pending feature, and keeps going.
 - **Scope discipline prevents context blowout.** One feature per session. AI agents love to scope-creep until they burn through the context window and produce half-finished work. Flywheel enforces focus: implement one thing, review it, commit merge-ready code, move on.
-- **4-layer review catches what single-model can't.** Self-review (cleanup) → Code review (fresh agent) → Cross-model (different AI catches blind spots) → E2E (real verification). Each layer catches what the previous one misses.
+- **4-layer review catches what single-model can't.** Cleanup (author proofreads) → Peer review (fresh agent) → Cross-model (different AI catches blind spots) → E2E (real verification). Each layer catches what the previous one misses.
 - **Dynamic feature management between sessions.** Add, revise, reprioritize, split, or remove features at any time with `/flywheel:features`. The project plan evolves with you — no need to re-initialize or restart.
 - **Pluggable, not locked-in.** Every spoke (planning, multi-agent, review) has a zero-dependency built-in default. Install superpowers, codex, playwright as you need them. Works with one tool or all four.
 - **Auditable by design.** Every session ends with a compliance table showing exactly what ran, what was skipped, and why. The handoff log is a complete audit trail of every feature implemented across the project.
@@ -85,7 +85,7 @@ The agent follows a **9-step loop**:
 | 5. Smoke test | Confirm baseline is healthy before touching code |
 | 6. Plan | Design the implementation approach |
 | 7. Implement | One feature only, with tests |
-| 8. Review | 4-layer pipeline: self-review → code review → cross-model → E2E |
+| 8. Review | 4-layer pipeline: cleanup → peer review → cross-model → E2E |
 | 9. Commit + handoff | Git commit, append handoff entry, update checklist |
 
 Every session ends with a compliance table:
@@ -102,8 +102,8 @@ SESSION FLOW SUMMARY — feat-001: Health endpoint
 │ 5  │ Smoke test           │ —            │ npm test + npm run build pass    │ ✅ OK    │
 │ 6  │ Plan                 │ plan-w-files │ task_plan.md created              │ ✅ OK    │
 │ 7  │ Implement            │ superpowers  │ /health with uptime + 5 tests    │ ✅ OK    │
-│ 8a │ Review: self-review  │ /simplify    │ superpowers:/simplify             │ ✅ OK    │
-│ 8b │ Review: code-review  │ code-reviewer│ superpowers code-reviewer (agent) │ ✅ OK    │
+│ 8a │ Review: cleanup      │ /simplify    │ superpowers:/simplify             │ ✅ OK    │
+│ 8b │ Review: peer-review  │ peer-reviewer│ superpowers peer-reviewer (agent) │ ✅ OK    │
 │ 8c │ Review: cross-model  │ codex:review │ codex:review (OpenAI)             │ ✅ OK    │
 │ 8d │ Review: e2e          │ playwright   │ Playwright browser verification   │ ✅ OK    │
 │ 9  │ Commit + handoff     │ —            │ Committed + handoff written      │ ✅ OK    │
@@ -129,8 +129,8 @@ Flywheel has two phases and three pluggable spokes:
                     │  Spoke   │ │ Agent    │ │  Pipeline    │
                     │          │ │ Spoke    │ │              │
                     │ built-in │ │ built-in │ │ 4 layers:    │
-                    │ planwf   │ │ worktree │ │  self-review │
-                    │ openspec │ │ gstack   │ │  code-review │
+                    │ planwf   │ │ worktree │ │  cleanup     │
+                    │ openspec │ │ gstack   │ │  peer-review │
                     │ superpwr │ │ superpwr │ │  cross-model │
                     └──────────┘ └──────────┘ │  e2e         │
                                               └──────────────┘
@@ -142,7 +142,7 @@ Each spoke is independent. All have a **built-in zero-dependency default** and o
 |-------|-----------------|----------------|
 | **Planning** | Claude generates `feature-checklist.json` directly | planning-with-files, OpenSpec, superpowers |
 | **Multi-Agent** | Claude Code `--worktree` + `Agent` tool | gstack Conductor, superpowers |
-| **Review** | Subagent code review + test suite smoke test | gstack, superpowers, codex, Playwright, Gemini CLI |
+| **Review** | Subagent peer review + test suite smoke test | gstack, superpowers, codex, Playwright, Gemini CLI |
 
 ### Recommended stack
 
@@ -154,8 +154,8 @@ The author's recommended configuration for maximum coverage:
 ├──────────────────┼──────────────────────────┼──────────────────────────────────┤
 │ Planning         │ planning-with-files      │ File-based plans with progress   │
 │ Multi-agent      │ superpowers              │ Parallel agent dispatch          │
-│ Self-review      │ superpowers /simplify    │ Author cleanup — dead code, etc  │
-│ Code review      │ superpowers code-reviewer│ Fresh Claude session as peer     │
+│ Cleanup          │ superpowers /simplify    │ Author cleanup — dead code, etc  │
+│ Peer review      │ superpowers peer-reviewer│ Fresh agent — bugs, security     │
 │ Cross-model      │ codex:review             │ Different model catches biases   │
 │ E2E              │ Playwright               │ Real browser verification        │
 └──────────────────┴──────────────────────────┴──────────────────────────────────┘
@@ -164,7 +164,7 @@ The author's recommended configuration for maximum coverage:
 **Install the recommended stack:**
 
 ```bash
-# 1. superpowers — multi-agent, self-review, code-review
+# 1. superpowers — multi-agent, cleanup, peer-review
 #    Source: https://github.com/obra/superpowers
 /plugin install superpowers@claude-plugins-official
 
@@ -185,7 +185,7 @@ npx skills add OthmanAdi/planning-with-files --skill planning-with-files -g
 
 Then run `/flywheel:init` — the initializer will auto-detect all four and pre-select them.
 
-> **Minimal setup:** If you only install one thing, install **superpowers**. It covers multi-agent, self-review, and code-review. Add **planning-with-files** for auditable plan artifacts. Add **codex** for cross-model bias detection. Add **Playwright** for real browser E2E instead of smoke tests.
+> **Minimal setup:** If you only install one thing, install **superpowers**. It covers multi-agent, cleanup, and peer review. Add **planning-with-files** for auditable plan artifacts. Add **codex** for cross-model bias detection. Add **Playwright** for real browser E2E instead of smoke tests.
 
 ## The handoff log
 
@@ -203,8 +203,8 @@ The handoff log (`claude-progress.jsonl`) is the flywheel's memory. Each session
   ],
   "tests": { "unit": 5, "e2e": 5, "all_passing": true },
   "review": {
-    "self-review": "built-in",
-    "code-review": "built-in (code-reviewer subagent)",
+    "cleanup": "built-in",
+    "peer-review": "built-in (peer-reviewer subagent)",
     "cross-model": "skipped (disabled)",
     "e2e": "npm test + npm run build"
   },
@@ -255,12 +255,46 @@ Each layer catches what the previous one misses:
 
 | Layer | Catches | Tools |
 |-------|---------|-------|
-| **1. Self-review** | Dead code, duplication, unnecessary complexity | superpowers /simplify |
-| **2. Code review** | Logic bugs, security issues, convention violations | gstack /review, superpowers code-reviewer |
+| **1. Cleanup** | Dead code, duplication, unnecessary complexity | superpowers /simplify |
+| **2. Peer review** | Logic bugs, security issues, convention violations | gstack /review, superpowers peer-reviewer |
 | **3. Cross-model** | Systematic biases of the authoring model | **codex:review** (primary), gstack /codex, Gemini CLI |
 | **4. E2E** | Integration failures, broken UI, API contract violations | gstack /qa, Playwright |
 
-Minimum required: layers 2 + 4. All four recommended when tools are available.
+Which layers run depends on the active **profile** — see [Stage profiles](#stage-profiles). Default (`standard`): layers 2 + 4. All four on `full`.
+
+## Stage profiles
+
+Profiles control which review layers run per session — optimizing token usage without sacrificing quality where it matters.
+
+```
+┌──────────┬──────────┬─────────────┬──────────────┬──────────────┬──────────┐
+│ Profile  │ Planning │ Cleanup     │ Peer review  │ Cross-model  │ E2E      │
+├──────────┼──────────┼─────────────┼──────────────┼──────────────┼──────────┤
+│ full     │ ✅       │ ✅          │ ✅ full      │ ✅           │ ✅       │
+│ standard │ ✅       │ —           │ ✅ top 5     │ —            │ ✅       │
+│ light    │ ✅       │ —           │ ✅ verdict   │ —            │ —        │
+│ draft    │ ✅       │ —           │ —            │ —            │ —        │
+└──────────┴──────────┴─────────────┴──────────────┴──────────────┴──────────┘
+```
+
+- **full** — all layers, full verbosity. For high-priority or security-sensitive features.
+- **standard** — peer review (top 5 issues) + E2E. Good default for most features.
+- **light** — peer review (pass/fail verdict only). Quick validation for low-priority work.
+- **draft** — planning only. For rapid prototyping — no review overhead.
+
+### Adaptive mode
+
+Set `"profile.default": "adaptive"` in config (the default). The agent auto-selects based on feature priority:
+
+| Feature priority | Profile | Rationale |
+|-----------------|---------|-----------|
+| 1–2 (high) | full | Core features get maximum scrutiny |
+| 3–5 (medium) | standard | Balanced coverage for typical work |
+| 6+ (low) | light | Fast validation for minor features |
+
+Bump rules override adaptive selection: first feature in the project always gets `full`, security-sensitive features always get `full`, and having a cross-model tool installed bumps one tier up.
+
+The agent presents the recommended profile at the start of each relay session — the user can accept or override.
 
 ## Rules
 

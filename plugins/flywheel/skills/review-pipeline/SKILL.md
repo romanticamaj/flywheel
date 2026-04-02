@@ -1,13 +1,13 @@
 ---
 name: review-pipeline
-description: Use when reviewing code changes before merge — 4-layer review pipeline (self-review, code review, cross-model, E2E) with framework-agnostic tool slots and a zero-dependency fallback
+description: Use when reviewing code changes before merge — 4-layer review pipeline (cleanup, peer review, cross-model, E2E) with framework-agnostic tool slots and a zero-dependency fallback
 ---
 
 # Review Pipeline
 
 ## Overview
 
-A 4-layer code review pipeline where each layer catches what the previous one misses. Layer 1 handles hygiene, Layer 2 catches logic bugs, Layer 3 eliminates model-specific blind spots, Layer 4 proves it actually works. Layers are framework-agnostic — slot in whatever tools are available.
+A 4-layer review pipeline where each layer catches what the previous one misses. Layer 1 (cleanup) handles hygiene, Layer 2 (peer review) catches logic bugs, Layer 3 (cross-model) eliminates model-specific blind spots, Layer 4 (E2E) proves it actually works. Layers are framework-agnostic — slot in whatever tools are available.
 
 ## When to Use
 
@@ -24,21 +24,26 @@ A 4-layer code review pipeline where each layer catches what the previous one mi
 
 | Layer | Purpose | Catches | Example Tools |
 |-------|---------|---------|---------------|
-| **1. Self-review** | Code hygiene, reuse, simplification | Dead code, duplication, unnecessary complexity | superpowers /simplify, manual review prompt |
-| **2. Code review** | Logic, bugs, security, conventions | Off-by-one, injection, race conditions, pattern violations | gstack /review, superpowers code-reviewer |
+| **1. Cleanup** | Code hygiene, reuse, simplification | Dead code, duplication, unnecessary complexity | superpowers /simplify, manual review prompt |
+| **2. Peer review** | Logic, bugs, security, conventions | Off-by-one, injection, race conditions, pattern violations | gstack /review, superpowers peer-reviewer |
 | **3. Cross-model** | Blind spots of the authoring model | Systematic biases, assumptions the first model made | codex:review (plugin), gstack /codex, Gemini CLI |
 | **4. E2E verification** | Does it actually work? | Integration failures, UI broken, API contract violations | gstack /qa, Playwright, manual browser test |
 
-## Tiers
+## Tiers & Profiles
 
-| Tier | Layers | When |
-|------|--------|------|
-| **Minimum** | Layer 2 (code review) + Layer 4 (E2E) | Required for every session |
-| **Recommended** | All 4 layers | When tools are available |
+Which layers run depends on the **active profile** selected at relay time:
+
+| Profile | Layers that run | Typical use |
+|---------|----------------|-------------|
+| **full** | All 4 (cleanup + peer review + cross-model + E2E) | High-priority or security-sensitive features |
+| **standard** | Peer review (top 5) + E2E | Default for most features |
+| **light** | Peer review (verdict only) | Low-priority features |
+| **draft** | None — planning only | Rapid prototyping |
 
 What you lose by skipping:
-- Skip Layer 1 → dead code and duplication accumulate
-- Skip Layer 3 → model-specific blind spots go undetected
+- Skip cleanup → dead code and duplication accumulate
+- Skip cross-model → model-specific blind spots go undetected
+- Skip E2E → integration failures slip through
 
 ## Contract Per Layer
 
@@ -70,8 +75,8 @@ Any step failure → report as critical issue.
 
 | Layer | Tool Options |
 |-------|-------------|
-| Self-review | superpowers /simplify, built-in prompt |
-| Code review | gstack /review, superpowers code-reviewer, built-in prompt |
+| Cleanup | superpowers /simplify, built-in prompt |
+| Peer review | gstack /review, superpowers peer-reviewer, built-in prompt |
 | Cross-model | codex:review (plugin), codex:adversarial-review (plugin), gstack /codex, Gemini CLI |
 | E2E | gstack /qa, Playwright, built-in smoke test |
 
@@ -87,5 +92,5 @@ How to detect each tool at runtime:
 | codex:adversarial-review (plugin) | `codex:adversarial-review` in skills/commands list |
 | gstack /codex | `gstack codex` in skills list |
 | codex CLI (direct) | `codex` command in PATH |
-| Playwright | `playwright` in `node_modules` or available via `npx` |
+| Playwright | `mcp__plugin_playwright_playwright__*` MCP tools or `playwright` plugin in skills list |
 | Gemini CLI | `gemini` command in PATH |

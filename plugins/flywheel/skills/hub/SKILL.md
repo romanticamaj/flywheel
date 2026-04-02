@@ -66,19 +66,40 @@ Path: `.flywheel/flywheel-config.json`
     "tool": "claude-code-native",
     "alternatives": ["gstack", "superpowers"]
   },
+  "profile": {
+    "default": "adaptive",
+    "adaptive_rules": {
+      "1-2": "full",
+      "3-5": "standard",
+      "6+": "light"
+    },
+    "bump_rules": {
+      "first_feature": "full",
+      "security_sensitive": "full",
+      "has_dependencies": "+1 tier",
+      "was_blocked": "full",
+      "has_cross_model_tool": "+1 tier"
+    }
+  },
   "review": {
-    "layers": ["self-review", "code-review", "cross-model", "e2e"],
+    "layers": ["cleanup", "peer-review", "cross-model", "e2e"],
     "tools": {
-      "self-review": "built-in",
-      "code-review": "built-in",
+      "cleanup": "built-in",
+      "peer-review": "built-in",
       "cross-model": null,
       "e2e": "built-in"
     },
     "alternatives": {
-      "self-review": ["superpowers:/simplify"],
-      "code-review": ["gstack:/review", "superpowers:code-reviewer"],
-      "cross-model": ["gstack:/codex", "gemini-cli"],
+      "cleanup": ["superpowers:/simplify"],
+      "peer-review": ["gstack:/review", "superpowers:peer-reviewer"],
+      "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
       "e2e": ["gstack:/qa", "playwright"]
+    },
+    "profiles": {
+      "full":     { "cleanup": true,  "peer-review": "full",    "cross-model": true,  "e2e": true  },
+      "standard": { "cleanup": false, "peer-review": "top5",    "cross-model": false, "e2e": true  },
+      "light":    { "cleanup": false, "peer-review": "verdict", "cross-model": false, "e2e": false },
+      "draft":    { "cleanup": false, "peer-review": false,     "cross-model": false, "e2e": false }
     }
   },
   "source": {
@@ -101,9 +122,13 @@ Path: `.flywheel/flywheel-config.json`
 | `planning.alternatives` | string[] | Known planning tools for future upgrades |
 | `multi_agent.tool` | string | Active multi-agent tool or `"claude-code-native"` |
 | `multi_agent.alternatives` | string[] | Known multi-agent tools for future upgrades |
-| `review.layers` | string[] | Fixed 4-layer pipeline: `["self-review", "code-review", "cross-model", "e2e"]` |
+| `profile.default` | string | `"adaptive"`, `"full"`, `"standard"`, `"light"`, or `"draft"` |
+| `profile.adaptive_rules` | object | Maps feature priority ranges to profiles |
+| `profile.bump_rules` | object | Conditions that override the adaptive selection |
+| `review.layers` | string[] | Fixed 4-layer pipeline: `["cleanup", "peer-review", "cross-model", "e2e"]` |
 | `review.tools` | object | Per-layer tool choice; `null` means layer is skipped |
 | `review.alternatives` | object | Per-layer list of known tools for future upgrades |
+| `review.profiles` | object | Per-profile layer config: `true`/`false`/`"full"`/`"top5"`/`"verdict"` |
 | `source.type` | string | How the checklist was sourced: `"file"`, `"user-input"`, `"codebase"`, or `"mixed"` |
 | `source.paths` | string[] | Spec files used as input |
 | `source.user_notes` | string\|null | Extra context from user conversation |
@@ -122,7 +147,7 @@ Path: `.flywheel/flywheel-config.json`
 ## Common Mistakes
 
 - **Trying to one-shot the whole app.** Context burns out mid-implementation. Use flywheel to break work into one-feature sessions with clean handoffs.
-- **Agent declares done prematurely.** Needs E2E verification, not just unit tests. The review pipeline (minimum tier: code review + E2E) catches this.
+- **Agent declares done prematurely.** Needs E2E verification, not just unit tests. The review pipeline (minimum tier: peer review + E2E) catches this.
 - **Agent does multiple features per session.** Leads to scope creep and half-finished work. The scope rule enforces one feature per session.
 - **Skipping the handoff log.** The next session has no context and starts from scratch. Every session must append to `claude-progress.jsonl` before exiting.
 - **Silently skipping review tools.** Agent substitutes a "similar" tool or skips a layer without attempting the configured tool first. The coding agent template now requires: attempt configured tool → log error if it fails → ask user before fallback → output compliance table at session end. See `coding-agent-template.md` Stage Tracker and Step 8a enforcement rules.

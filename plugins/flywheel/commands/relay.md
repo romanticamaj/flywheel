@@ -17,7 +17,7 @@ You are starting a Coding Agent session. Follow the 9-step loop.
 5. **Smoke test** — confirm app is alive
 6. **Plan** — invoke configured planning tool before writing any code
 7. **Implement** — one feature only; use multi-agent if configured
-8. **Review + verify** — run all 4 review layers (self-review, code-review, cross-model, e2e)
+8. **Review + verify** — run review layers per profile (cleanup, peer review, cross-model, e2e)
 9. **Commit + handoff + flow summary** — git commit, append to handoff log, update checklist, **output compliance table and session flow summary**
 
 **Exit rule:** Code must be merge-ready. No half-finished work.

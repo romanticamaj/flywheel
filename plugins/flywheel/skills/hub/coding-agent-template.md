@@ -20,8 +20,8 @@ STAGE TRACKER (initialize at session start):
 │ 5  │ Smoke test           │ —          │              │        │
 │ 6  │ Plan                 │ {plan.tool}│              │        │
 │ 7  │ Implement            │ —          │              │        │
-│ 8a │ Review: self-review  │ {tool}     │              │        │
-│ 8b │ Review: code-review  │ {tool}     │              │        │
+│ 8a │ Review: cleanup  │ {tool}     │              │        │
+│ 8b │ Review: peer-review  │ {tool}     │              │        │
 │ 8c │ Review: cross-model  │ {tool}     │              │        │
 │ 8d │ Review: e2e          │ {tool}     │              │        │
 │ 9  │ Commit + handoff     │ —          │              │        │
@@ -69,6 +69,71 @@ Read `.flywheel/feature-checklist.json` and select the next feature to implement
 4. Read the feature's `title`, `description`, and `acceptance_criteria` — these define the scope for this session.
 
 If no uncompleted items remain, report "all features complete" and exit the session.
+
+## Step 3b: Select Profile
+
+Profiles control which review layers run and how verbose their output is — optimizing token usage for different situations.
+
+### Profile Definitions
+
+```
+┌──────────┬──────────┬─────────────┬──────────────┬──────────┬──────────────┐
+│ Profile  │ Planning │ Cleanup     │ Peer review  │ Cross-model │ E2E      │
+├──────────┼──────────┼─────────────┼──────────────┼─────────────┼──────────┤
+│ full     │ ✅       │ ✅          │ ✅ full      │ ✅          │ ✅       │
+│ standard │ ✅       │ —           │ ✅ top 5     │ —           │ ✅       │
+│ light    │ ✅       │ —           │ ✅ verdict   │ —           │ —        │
+│ draft    │ ✅       │ —           │ —            │ —           │ —        │
+└──────────┴──────────┴─────────────┴──────────────┴─────────────┴──────────┘
+```
+
+- **full** — all 4 review layers with full output. For high-priority or critical features.
+- **standard** — peer review (top 5 issues) + E2E. Balanced coverage for daily work.
+- **light** — peer review verdict only. Quick iterations with basic sanity check.
+- **draft** — no review. Prototyping and exploration. Still commits merge-ready code.
+
+### Adaptive Mode
+
+If `profile.default` is `"adaptive"` in config, auto-select based on feature priority:
+
+| Feature priority | Auto-selected profile | Rationale |
+|-----------------|----------------------|-----------|
+| 1–2 (high) | `full` | Critical features get maximum review coverage |
+| 3–5 (medium) | `standard` | Peer review + E2E catches most issues |
+| 6+ (low) | `light` | Quick iterations, just peer review verdict |
+
+**Bump rules** (override the priority mapping):
+- First feature in the project → use `full` (establish baseline quality)
+- Feature is security-sensitive (auth, payments, permissions) → use `full`
+- Feature has `dependencies` on other features → bump up one tier (more integration risk)
+- Feature was previously `blocked` and is being retried → use `full` (something already went wrong)
+- Cross-model tool is installed → bump up one tier (use the tool you have)
+
+### Relay-Time Prompt
+
+After selecting the feature (Step 3), present the profile choice:
+
+```
+feat-007: "Rate limiting middleware" (priority 2)
+→ Adaptive recommends: full (high priority feature)
+
+┌──────────┬──────────┬─────────────┬──────────────┬─────────────┬──────────┐
+│ Profile  │ Planning │ Cleanup     │ Peer review  │ Cross-model │ E2E      │
+├──────────┼──────────┼─────────────┼──────────────┼─────────────┼──────────┤
+│ full     │ ✅       │ ✅          │ ✅ full      │ ✅          │ ✅       │
+│ standard │ ✅       │ —           │ ✅ top 5     │ —           │ ✅       │
+│ light    │ ✅       │ —           │ ✅ verdict   │ —           │ —        │
+│ draft    │ ✅       │ —           │ —            │ —           │ —        │
+└──────────┴──────────┴─────────────┴──────────────┴─────────────┴──────────┘
+
+Profile [1 - full]:
+```
+
+User hits enter to accept the adaptive recommendation, or picks a number to override.
+
+**If `profile.default` is a fixed profile** (not `"adaptive"`), skip the prompt and use that profile directly. Still show which profile is active in the stage tracker.
+
+Record the selected profile in the stage tracker's header.
 
 ---
 
@@ -123,13 +188,27 @@ Implement the feature selected in Step 3, following the plan from Step 6. Rules:
 
 ## Step 8: Review + Verify
 
-Run the review pipeline by iterating through each configured layer in `.flywheel/flywheel-config.json`.
+Run the review pipeline based on the **active profile** selected in Step 3b. Only layers enabled by the profile are executed.
 
-### 8a. Execute Each Review Layer
+### 8a. Profile-Aware Layer Dispatch
+
+Check the active profile from Step 3b. For each review layer, determine whether it runs:
+
+```
+Profile lookup:
+  full     → run: cleanup, peer-review, cross-model, e2e
+  standard → run: peer-review, e2e
+  light    → run: peer-review
+  draft    → run: (none — skip to Step 8d)
+```
+
+For each **enabled** layer, follow the execution rules below. For **disabled** layers, log as `"— (profile: {profile})"` in the tracker and move on. No need to ask the user — the profile choice already authorized it.
+
+### 8b. Execute Enabled Review Layers
 
 **ENFORCEMENT: You MUST attempt the configured tool first. Running a different tool "because it's similar" is a VIOLATION, not a fallback.** The only legitimate fallback triggers are: (1) the tool command is not found, (2) the tool invocation returns an error, (3) the tool is `null` in config (explicitly disabled).
 
-For each layer in `review.layers` (self-review, code-review, cross-model, e2e):
+For each enabled layer in `review.layers` (cleanup, peer-review, cross-model, e2e):
 
 1. Read the tool name from `review.tools[layer]`.
 2. If the tool is `null` → **skip** (layer explicitly disabled). Log as `"skipped (disabled)"`. Update tracker: Status = `✅ OK`.
@@ -151,12 +230,62 @@ For each layer in `review.layers` (self-review, code-review, cross-model, e2e):
 6. If user chose to skip → update tracker: Status = `❌ SKIPPED (user approved)`.
 
 **Common rationalization traps (these are VIOLATIONS, not fallbacks):**
-- "The simplify agents already covered code review" → NO. `gstack:/review` must still be invoked.
+- "The cleanup agents already covered peer review" → NO. If peer-review is enabled by the profile, it must run.
 - "Codex plugin is not installed so I'll skip cross-model" → NO. Attempt the invocation first; if it fails, show install instructions and ask the user.
-- "The mock test covers E2E" → NO. `gstack:/qa` must be attempted first.
+- "The mock test covers E2E" → NO. If E2E is enabled by the profile, `gstack:/qa` must be attempted first.
 - "I already found issues, so another review pass is redundant" → NO. Each layer catches different things.
 
-**Cross-model tool invocation guide:**
+### 8c. Peer Review Subagent Isolation
+
+**Peer review (8b) runs as an isolated subagent** to save tokens in the main context. The subagent receives the git diff and returns a structured response — not raw review text.
+
+**Dispatch:**
+
+```
+Main session                          Peer review subagent
+┌────────────────┐                   ┌────────────────────┐
+│ Step 8b:       │                   │                    │
+│ Dispatch with  │──── git diff ────▶│ Full peer review   │
+│ verbosity flag │                   │ (runs in isolation) │
+│                │◀── structured ────│                    │
+│ Receive result │    response only  │ (context discarded) │
+└────────────────┘                   └────────────────────┘
+```
+
+**Verbosity is set by the active profile:**
+
+| Profile | Peer review verbosity | What comes back | ~Tokens |
+|---------|----------------------|-----------------|---------|
+| `full` | `full` | Pass/fail + all issues with file:line + suggestions | ~2000 |
+| `standard` | `top5` | Pass/fail + up to 5 critical/important issues only | ~200 |
+| `light` | `verdict` | Pass/fail + 1-line summary | ~20 |
+
+**Structured response format:**
+
+```json
+{
+  "verdict": "pass",
+  "summary": "Clean implementation, no critical issues",
+  "issues": [
+    {
+      "severity": "critical",
+      "file": "src/auth.js:45",
+      "message": "Missing input validation on email field"
+    }
+  ],
+  "issue_counts": { "critical": 0, "important": 1, "minor": 3 }
+}
+```
+
+- `verdict` verbosity → only `verdict` + `summary` returned to main context
+- `top5` verbosity → `verdict` + `summary` + top 5 issues (critical first, then important)
+- `full` verbosity → everything returned
+
+**Fail escalation:** If `verdict` is `"fail"` and the profile is `light` (verdict-only), the main agent cannot see why. In this case, automatically escalate: re-run peer review with `top5` verbosity to surface actionable issues. Log: `"peer-review: verdict=fail → escalated to top5"`.
+
+### 8d. Cross-Model Tool Invocation Guide
+
+Only runs when profile is `full`.
 
 | Configured tool | How to invoke | Fallback chain |
 |---|---|---|
@@ -171,31 +300,25 @@ For each layer in `review.layers` (self-review, code-review, cross-model, e2e):
 4. If user chooses B, try the next alternative in `review.alternatives["cross-model"]`.
 5. If user chooses C, log as `❌ SKIPPED (user approved)`.
 
-### 8b. Minimum Tier (Required)
-
-At minimum, these two layers MUST run — even if using built-in fallbacks:
-
-- **Layer 2 (code-review):** Invoke the configured tool, or fall back to alternatives, or spawn a code-reviewer subagent.
-- **Layer 4 (e2e):** Invoke the configured tool, or run built-in smoke test: `init.sh` exit 0, test suite passes, health endpoint returns 200.
-
-### 8c. Log Review Results
+### 8e. Log Review Results
 
 Record which tool was used for each layer — this goes into the handoff entry (Step 9b):
 
 ```json
 "review": {
-  "self-review": "superpowers:/simplify",
-  "code-review": "gstack:/review",
-  "cross-model": "codex:review — plugin not installed → gstack:/codex (fallback)",
-  "e2e": "gstack:/qa"
+  "profile": "standard",
+  "cleanup": "— (profile: standard)",
+  "peer-review": "superpowers:peer-reviewer (top5, 1 important issue)",
+  "cross-model": "— (profile: standard)",
+  "e2e": "built-in smoke test"
 }
 ```
 
 When logging fallbacks, include the chain: `"{configured} — {error} → {fallback used}"`.
 
-### 8d. Verify Acceptance Criteria
+### 8f. Verify Acceptance Criteria
 
-After all review layers pass, verify each acceptance criterion from the checklist is met.
+After all enabled review layers pass, verify each acceptance criterion from the checklist is met.
 
 **If critical issues are found:**
 
@@ -226,7 +349,7 @@ Use the feature ID and title from the checklist. Only add files that were change
 Append a single JSONL entry to `.flywheel/claude-progress.jsonl`:
 
 ```json
-{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","status":"completed","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"review":{"self-review":"superpowers:/simplify","code-review":"gstack:/review","cross-model":"skipped (disabled)","e2e":"built-in smoke test"},"planning":{"tool":"planning-with-files","output":"task_plan.md with 5 steps"},"multi_agent":{"tool":"not used","reason":"single-threaded implementation"},"compliance":{"total":16,"ok":15,"fallback":0,"skipped":1,"violations":0},"flow_summary":"Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: self-review OK, code-review OK, cross-model skipped (user-approved), e2e OK. 6/6 acceptance criteria met.","next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
+{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","status":"completed","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"review":{"cleanup":"superpowers:/simplify","peer-review":"gstack:/review","cross-model":"skipped (disabled)","e2e":"built-in smoke test"},"planning":{"tool":"planning-with-files","output":"task_plan.md with 5 steps"},"multi_agent":{"tool":"not used","reason":"single-threaded implementation"},"compliance":{"total":16,"ok":15,"fallback":0,"skipped":1,"violations":0},"flow_summary":"Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: cleanup OK, peer-review OK, cross-model skipped (user-approved), e2e OK. 6/6 acceptance criteria met.","next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
 ```
 
 Fields:
@@ -265,7 +388,7 @@ Format:
 
 ```
 SESSION FLOW SUMMARY — feat-XXX: <feature title>
-Branch: <branch name> | Commits: <commit hashes>
+Branch: <branch name> | Commits: <commit hashes> | Profile: <active profile>
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ STAGE COMPLIANCE                                                                │
@@ -279,8 +402,8 @@ Branch: <branch name> | Commits: <commit hashes>
 │ 5  │ Smoke test           │ —                │ npm run build passes    │ ✅ OK  │
 │ 6  │ Plan                 │ planning-w-files │ task_plan.md created    │ ✅ OK  │
 │ 7  │ Implement            │ —                │ 3 files created         │ ✅ OK  │
-│ 8a │ Review: self-review  │ /simplify        │ superpowers:/simplify   │ ✅ OK  │
-│ 8b │ Review: code-review  │ code-reviewer    │ code-reviewer agent     │ ✅ OK  │
+│ 8a │ Review: cleanup  │ /simplify        │ superpowers:/simplify   │ ✅ OK  │
+│ 8b │ Review: peer-review  │ peer-reviewer    │ peer-reviewer agent     │ ✅ OK  │
 │ 8c │ Review: cross-model  │ codex            │ codex — not found       │ ❌ SKIP│
 │ 8d │ Review: e2e          │ built-in         │ npm test + curl :3000   │ ✅ OK  │
 │ 9  │ Commit + handoff     │ —                │ 2 commits, log updated  │ ✅ OK  │
@@ -295,10 +418,10 @@ Branch: <branch name> | Commits: <commit hashes>
 ├──────────────┼──────────────────┼───────────────────────────────────────────────┤
 │ Planning     │ planning-w-files │ task_plan.md with 5 steps                     │
 │ Multi-agent  │ not used         │ single-threaded — no parallelizable subtasks  │
-│ Review (L1)  │ /simplify        │ pass — simplified 2 functions                 │
-│ Review (L2)  │ code-reviewer    │ pass — no issues                              │
-│ Review (L3)  │ codex            │ skipped — command not found (user approved)   │
-│ Review (L4)  │ built-in         │ pass — tests green, health check 200          │
+│ Cleanup      │ /simplify        │ pass — simplified 2 functions                 │
+│ Peer review  │ peer-reviewer    │ pass — no issues                              │
+│ Cross-model  │ codex            │ skipped — command not found (user approved)   │
+│ E2E          │ built-in         │ pass — tests green, health check 200          │
 └──────────────┴──────────────────┴───────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -318,7 +441,7 @@ NEXT UP: feat-002 — User profile settings
 
 **Rules:**
 1. **Every section must be filled in.** If a spoke was not used, show it in the table with a reason (e.g., "not used — no parallelizable subtasks").
-2. **Spoke Usage table must show all 4 review layers**, even if some were skipped or disabled.
+2. **Spoke Usage table must show all 4 review layers** (Cleanup, Peer review, Cross-model, E2E), even if some were skipped or disabled by the profile.
 3. **Acceptance Criteria must list ALL criteria** from the checklist with pass/fail status.
 4. **Key Decisions** — list any notable technical decisions, trade-offs, or surprises. If none, write "None — straightforward implementation."
 5. A **violation** is when a stage was skipped or substituted WITHOUT attempting the configured tool and WITHOUT user approval. Violations should be zero. If non-zero, explain in Key Decisions.
@@ -333,7 +456,7 @@ Also include in the handoff JSONL entry:
   "skipped": 1,
   "violations": 0
 },
-"flow_summary": "Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: L1 OK, L2 OK, L3 skipped (user), L4 OK. 3/3 acceptance criteria met."
+"flow_summary": "Profile: full. Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: cleanup OK, peer-review OK, cross-model skipped (user), e2e OK. 3/3 acceptance criteria met."
 ```
 
 ---

@@ -39,7 +39,7 @@ When parallel agents complete their features:
 | Tool | Install | What it provides |
 |------|---------|-----------------|
 | **gstack** | `git clone` gstack repo | `/plan-ceo-review`, `/plan-eng-review`, `/review`, `/qa`, `/ship` + Conductor for parallel sprints |
-| **superpowers** | Already a Claude Code plugin | `dispatching-parallel-agents`, `subagent-driven-development`, `code-reviewer` agent |
+| **superpowers** | Already a Claude Code plugin | `dispatching-parallel-agents`, `subagent-driven-development`, `peer-reviewer` agent |
 | **Claude Code native** | Built-in | `--worktree` for isolation, `Agent` tool with `subagent_type` for parallel dispatch |
 
 ## Detection
