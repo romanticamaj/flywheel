@@ -7,7 +7,7 @@ description: Use when starting a long-running project that will span multiple se
 
 ## Overview
 
-Long-running agent work succeeds through zero-cost session handoffs, not through one long session that burns out its context window. Flywheel uses a dual-prompt architecture: an **Initializer** (run once) sets up the project with tool detection and artifact generation, then a **Coding Agent** (run N times) executes an 9-step loop — each session implements one feature and leaves a machine-readable handoff for the next. Works out-of-the-box with zero dependencies (just Claude Code + filesystem), upgradable with framework tools at any time.
+Long-running agent work succeeds through zero-cost session handoffs, not through one long session that burns out its context window. Flywheel uses a dual-prompt architecture: an **Initializer** (run once) sets up the project with tool detection and artifact generation, then a **Coding Agent** (run N times) executes a 10-step loop — each session implements one feature and leaves a machine-readable handoff for the next. Works out-of-the-box with zero dependencies (just Claude Code + filesystem), upgradable with framework tools at any time.
 
 ## When to Use
 
@@ -30,7 +30,7 @@ See `initializer-template.md` for the full Initializer protocol — runtime dete
 
 ### Phase 2: Coding Agent (run N times)
 
-Each session follows an 9-step loop: validate config, read handoff log, read checklist, bootstrap, smoke test, plan the implementation, implement one feature, review + verify, commit + handoff.
+Each session follows a 10-step loop: validate config, read handoff log, read checklist, bootstrap, smoke test, plan the implementation, implement one feature, review + verify, commit + handoff, user verification checkpoint.
 
 See `coding-agent-template.md` for the full Coding Agent protocol — step-by-step instructions, error handling table, exit rule, and scope rule.
 
@@ -147,7 +147,7 @@ Path: `.flywheel/flywheel-config.json`
 ## Common Mistakes
 
 - **Trying to one-shot the whole app.** Context burns out mid-implementation. Use flywheel to break work into one-feature sessions with clean handoffs.
-- **Agent declares done prematurely.** Needs E2E verification, not just unit tests. The review pipeline (minimum tier: peer review + E2E) catches this.
+- **Agent declares done prematurely.** Needs E2E verification, not just unit tests. The review pipeline (minimum tier: peer review + E2E) catches this. Step 10 (verification checkpoint) ensures the user confirms the feature works before it's marked `verified`.
 - **Agent does multiple features per session.** Leads to scope creep and half-finished work. The scope rule enforces one feature per session.
 - **Skipping the handoff log.** The next session has no context and starts from scratch. Every session must append to `claude-progress.jsonl` before exiting.
 - **Silently skipping review tools.** Agent substitutes a "similar" tool or skips a layer without attempting the configured tool first. The coding agent template now requires: attempt configured tool → log error if it fails → ask user before fallback → output compliance table at session end. See `coding-agent-template.md` Stage Tracker and Step 8a enforcement rules.

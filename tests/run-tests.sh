@@ -1233,7 +1233,7 @@ assert isinstance(c['features'], list), 'features is not a list'
 
 # Feature-level validation
 ids = []
-valid_statuses = {'pending', 'in-progress', 'completed', 'blocked', 'split'}
+valid_statuses = {'pending', 'in-progress', 'implemented', 'needs-fix', 'verified', 'completed', 'blocked', 'split'}
 for f in c['features']:
     # Required fields
     assert 'id' in f, f'feature missing id: {f}'
@@ -1257,9 +1257,13 @@ for f in c['features']:
     if f['status'] == 'split':
         assert 'split_into' in f, f'split feature {f[\"id\"]} missing split_into'
 
-    # Completed features must have completed_by_session
+    # Completed/verified features must have a timestamp
     if f['status'] == 'completed':
         assert f.get('completed_by_session') is not None, f'completed feature {f[\"id\"]} missing completed_by_session'
+    if f['status'] == 'verified':
+        assert f.get('verified_at') is not None or f.get('completed_by_session') is not None, f'verified feature {f[\"id\"]} missing verified_at'
+    if f['status'] == 'implemented':
+        assert f.get('implemented_at') is not None or f.get('completed_by_session') is not None, f'implemented feature {f[\"id\"]} missing timestamp'
 
     ids.append(f['id'])
 

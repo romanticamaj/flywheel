@@ -1,6 +1,6 @@
-# Coding Agent Template — 9-Step Session Loop (with Flow Summary)
+# Coding Agent Template — 10-Step Session Loop (with Flow Summary)
 
-This template defines the loop that every Coding Agent session follows in the flywheel protocol. Each session picks up where the last left off, implements exactly one feature, and leaves the codebase merge-ready.
+This template defines the loop that every Coding Agent session follows in the flywheel protocol. Each session picks up where the last left off, implements exactly one feature, guides the user through verification, and leaves the codebase merge-ready.
 
 ---
 
@@ -25,6 +25,7 @@ STAGE TRACKER (initialize at session start):
 │ 8c │ Review: cross-model  │ {tool}     │              │        │
 │ 8d │ Review: e2e          │ {tool}     │              │        │
 │ 9  │ Commit + handoff     │ —          │              │        │
+│ 10 │ Verification         │ —          │              │        │
 └────┴──────────────────────┴────────────┴──────────────┴────────┘
 
 Status values: ✅ OK | ⚠️ FALLBACK | ❌ SKIPPED | 🔄 PENDING
@@ -65,10 +66,11 @@ Read `.flywheel/feature-checklist.json` and select the next feature to implement
 
 1. Parse the checklist.
 2. Skip any item with status `blocked`.
-3. Pick the highest priority uncompleted item (lowest `priority` number).
-4. Read the feature's `title`, `description`, and `acceptance_criteria` — these define the scope for this session.
+3. **First**, check for features with status `needs-fix` — these are user-verified issues that take priority over new work. Pick the highest priority `needs-fix` item.
+4. If no `needs-fix` items, pick the highest priority `pending` item (lowest `priority` number).
+5. Read the feature's `title`, `description`, and `acceptance_criteria` — these define the scope for this session.
 
-If no uncompleted items remain, report "all features complete" and exit the session.
+If no actionable items remain (all `verified`, `blocked`, or `completed`), report "all features complete" and exit the session.
 
 ## Step 3b: Select Profile
 
@@ -349,17 +351,18 @@ Use the feature ID and title from the checklist. Only add files that were change
 Append a single JSONL entry to `.flywheel/claude-progress.jsonl`:
 
 ```json
-{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","status":"completed","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"review":{"cleanup":"superpowers:/simplify","peer-review":"gstack:/review","cross-model":"skipped (disabled)","e2e":"built-in smoke test"},"planning":{"tool":"planning-with-files","output":"task_plan.md with 5 steps"},"multi_agent":{"tool":"not used","reason":"single-threaded implementation"},"compliance":{"total":16,"ok":15,"fallback":0,"skipped":1,"violations":0},"flow_summary":"Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: cleanup OK, peer-review OK, cross-model skipped (user-approved), e2e OK. 6/6 acceptance criteria met.","next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
+{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","status":"verified","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"review":{"cleanup":"superpowers:/simplify","peer-review":"gstack:/review","cross-model":"skipped (disabled)","e2e":"built-in smoke test"},"verification":{"status":"user-verified","verified_at":"2026-03-23T14:35:00Z","fix_items":[]},"planning":{"tool":"planning-with-files","output":"task_plan.md with 5 steps"},"multi_agent":{"tool":"not used","reason":"single-threaded implementation"},"compliance":{"total":16,"ok":15,"fallback":0,"skipped":1,"violations":0},"flow_summary":"Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: cleanup OK, peer-review OK, cross-model skipped (user-approved), e2e OK. 6/6 acceptance criteria met. Verification: user-verified.","next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
 ```
 
 Fields:
 - `timestamp` — ISO 8601 UTC timestamp of commit
 - `feature_id` — the feature ID from the checklist (e.g., `feat-001`)
 - `feature_title` — human-readable title
-- `status` — `completed`, `blocked`, or `aborted`
+- `status` — `verified`, `implemented`, `needs-fix`, `blocked`, or `aborted`
 - `changes` — array of short descriptions of what changed
 - `tests` — object with `unit` count, `e2e` count, and `all_passing` boolean
 - `review` — object recording which tool was used (or skipped/fallback) for each review layer
+- `verification` — object with `status` (`user-verified`, `needs-fix`, `deferred`), optional `verified_at`, optional `reason`, optional `fix_items`
 - `planning` — object with `tool` used and `output` description
 - `multi_agent` — object with `tool` used and `reason` if not used
 - `compliance` — object with stage counts: `total`, `ok`, `fallback`, `skipped`, `violations`
@@ -370,8 +373,10 @@ Fields:
 ### 9c. Update Checklist
 
 In `.flywheel/feature-checklist.json`:
-- Set the feature's `status` to `completed`.
-- Set `completed_by_session` to the current ISO 8601 UTC timestamp.
+- Set the feature's `status` to `implemented`.
+- Set `implemented_at` to the current ISO 8601 UTC timestamp.
+
+> **Note:** The status is `implemented`, not `verified`. The user confirms verification in Step 10.
 
 ### 9d. Log Rotation
 
@@ -407,8 +412,9 @@ Branch: <branch name> | Commits: <commit hashes> | Profile: <active profile>
 │ 8c │ Review: cross-model  │ codex            │ codex — not found       │ ❌ SKIP│
 │ 8d │ Review: e2e          │ built-in         │ npm test + curl :3000   │ ✅ OK  │
 │ 9  │ Commit + handoff     │ —                │ 2 commits, log updated  │ ✅ OK  │
+│ 10 │ Verification         │ —                │ user verified           │ ✅ OK  │
 ├────┴──────────────────────┴──────────────────┴─────────────────────────┴────────┤
-│ RESULT: 12/13 stages OK, 1 skipped (user-approved), 0 violations              │
+│ RESULT: 13/14 stages OK, 1 skipped (user-approved), 0 violations              │
 └────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -461,6 +467,122 @@ Also include in the handoff JSONL entry:
 
 ---
 
+## Step 10: Verification Checkpoint
+
+After commit and flow summary, guide the user through verifying the feature before moving on. This step is **interactive** — the user responds within the current session.
+
+### 10a. Profile Gate
+
+Check the active profile to determine whether verification runs:
+
+| Profile | Verification | Rationale |
+|---------|-------------|-----------|
+| `full` | **Required** — prompt user | Critical features need human sign-off |
+| `standard` | **Prompted** — prompt user | Default for most work |
+| `light` | **Optional** — offer but don't block | Quick iterations |
+| `draft` | **Skipped** — auto-set `implemented` | Rapid prototyping, no gate |
+
+If `draft` profile, skip to session end. Feature stays as `implemented`.
+
+### 10b. Present Verification Prompt
+
+Show the user what to test and how:
+
+```
+── Verification Checkpoint ──
+Feature: feat-XXX "<feature title>" is ready for your review.
+
+Quick test commands:
+  <auto-detected commands based on project type>
+
+Acceptance criteria to verify:
+  ☐ <criterion 1>
+  ☐ <criterion 2>
+  ☐ <criterion 3>
+
+What would you like to do?
+  1. ✅ Verified — mark as done
+  2. 🐛 Found issues — add fixes to checklist
+  3. ⏭️  Skip — I'll verify later (stays as "implemented")
+```
+
+**Auto-detect test commands** based on project markers:
+- Node.js: `npm test`, `npm start` + `curl http://localhost:<port>/<relevant-path>`
+- Python: `pytest`, `python manage.py runserver`
+- Rust: `cargo test`, `cargo run`
+- Go: `go test ./...`, `go run .`
+- General: whatever `init.sh` starts + the E2E commands from the review pipeline
+
+### 10c. Handle User Response
+
+**Option 1 — Verified:**
+- Update feature status in `.flywheel/feature-checklist.json` to `verified`.
+- Set `verified_at` to current ISO 8601 UTC timestamp.
+- Update handoff JSONL entry: `"verification": "user-verified"`.
+- Update stage tracker: Step 10 = `✅ OK (user verified)`.
+
+**Option 2 — Found issues:**
+- Ask the user to describe what's wrong (one prompt).
+- Create fix sub-features in the checklist:
+  - ID format: `{parent_id}.fix-{n}` (e.g., `feat-001.fix-1`)
+  - Priority: same as parent feature (fixes inherit urgency)
+  - Status: `pending`
+  - Link back to parent: `"parent_id": "feat-001"`
+- Set parent feature status to `needs-fix`.
+- Set `needs_fix_reason` on the parent feature.
+- Update handoff JSONL entry: `"verification": "needs-fix"`, `"fix_items": ["feat-001.fix-1", ...]`.
+- Update stage tracker: Step 10 = `⚠️ NEEDS-FIX (N fix items created)`.
+- The next relay session will pick up the fix items first (Step 3 prioritizes `needs-fix`).
+
+**Option 3 — Skip:**
+- Feature stays as `implemented`.
+- Update handoff JSONL entry: `"verification": "deferred"`.
+- Update stage tracker: Step 10 = `⏭️ DEFERRED`.
+- The user can verify later by running `/flywheel:features` to update the status manually.
+
+### 10d. Update Handoff Entry
+
+Append verification result to the JSONL entry written in Step 9b:
+
+```json
+"verification": {
+  "status": "user-verified",
+  "verified_at": "2026-03-23T14:35:00Z",
+  "fix_items": []
+}
+```
+
+Or for needs-fix:
+
+```json
+"verification": {
+  "status": "needs-fix",
+  "reason": "Login form doesn't redirect after successful auth",
+  "fix_items": ["feat-001.fix-1"]
+}
+```
+
+---
+
+## Feature Status Flow
+
+```
+pending → in-progress → implemented → verified ✅
+                              ↓
+                          needs-fix → (next relay fixes) → implemented → verified ✅
+```
+
+Valid statuses: `pending`, `in-progress`, `implemented`, `needs-fix`, `verified`, `blocked`
+
+- `pending` — not started
+- `in-progress` — being worked on in current session
+- `implemented` — code committed, awaiting user verification
+- `needs-fix` — user found issues, fix sub-features created
+- `verified` — user confirmed it works
+- `blocked` — cannot proceed, needs human intervention
+
+---
+
 ## Error Handling
 
 | Step | Failure | Action |
@@ -474,6 +596,7 @@ Also include in the handoff JSONL entry:
 | 7. Implement | Unresolvable blocker | Mark feature as `blocked` in checklist with reason, move to next priority. If no next priority, abort session. |
 | 8. Review | Critical issues found | Loop back to step 7 (max 3 retries). If still failing, revert changes, mark feature `blocked`, abort session. |
 | 9. Commit | Git conflict | Abort session, log conflict details to handoff for human resolution |
+| 10. Verification | User unresponsive / session ends | Feature stays as `implemented`; user can verify later via `/flywheel:features` |
 
 ---
 
@@ -497,3 +620,5 @@ These are failure modes observed in real sessions. If you catch yourself doing a
 | **Stale handoff notes** | Handoff note contains outdated information from earlier in the session | Re-read your handoff note before writing it. Does it reflect the final state? |
 | **Missing flow summary** | Agent outputs "done" without the session flow summary | The flow summary is Step 9e. It is not optional — it shows stage compliance, spoke usage, and acceptance criteria in one output. |
 | **Skipped planning** | Agent jumps straight to implementation without invoking the planning tool | Step 6 is required. Even for simple features, plan the approach first. |
+| **Auto-verified** | Agent marks feature as `verified` without asking the user | Only the user can verify. The agent sets `implemented`; Step 10 prompts the user. |
+| **Skipped verification** | Agent ends session without presenting the verification checkpoint | Step 10 is required for `full` and `standard` profiles. Show the prompt. |
