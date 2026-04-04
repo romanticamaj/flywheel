@@ -43,8 +43,11 @@ RECOMMENDED TOOLS — status
 │   │                  │ (task_plan.md, progress)          │           │
 │ 3 │ codex            │ Cross-model review               │ ✅ / ⬜   │
 │   │                  │ (requires OpenAI/ChatGPT)        │           │
-│ 4 │ Playwright       │ Real browser E2E verification    │ ✅ / ⬜   │
+│ 4 │ Playwright       │ Web E2E verification             │ ✅ / ⬜   │
 └───┴──────────────────┴──────────────────────────────────┴───────────┘
+
+Note: Playwright covers web E2E. For mobile, desktop, and audio plugin E2E,
+additional platform-specific tools are configured in Section 2 (Review — E2E).
 ```
 
 - **✅** = detected, no action needed
@@ -202,7 +205,10 @@ Check the active Claude Code skills list for known skill names:
 | Review — cleanup | `superpowers` (code-simplifier / /simplify) |
 | Review — peer-review | `gstack` (/review), `superpowers` (peer-reviewer) |
 | Review — cross-model | `codex:review` or `codex:rescue` (codex-plugin-cc — **primary**), `gstack` (/codex) |
-| Review — E2E | `gstack` (/qa), `playwright` (MCP tools: `mcp__plugin_playwright_playwright__*`) |
+| Review — E2E (web) | `gstack` (/qa), `playwright` (MCP tools: `mcp__plugin_playwright_playwright__*`) |
+| Review — E2E (mobile) | `mobile-mcp` (MCP tools with `mobile` prefix), `ios-simulator-mcp` (MCP tools with `ios_simulator` prefix), `maestro` CLI in PATH |
+| Review — E2E (desktop) | `electron-playwright-mcp` (MCP tools with `electron` prefix), `tauri-plugin-mcp` (MCP tools with `tauri` prefix) |
+| Review — E2E (audio-plugin) | `pluginval` CLI in PATH |
 
 ### Step 2: Check node_modules for npm Packages
 
@@ -225,12 +231,16 @@ npm list -g openspec --depth=0 2>/dev/null
 ```
 which gemini 2>/dev/null || where gemini 2>NUL
 which codex 2>/dev/null || where codex 2>NUL
+which maestro 2>/dev/null || where maestro 2>NUL
+which pluginval 2>/dev/null || where pluginval 2>NUL
 ```
 
 | CLI tool | Maps to spoke | Note |
 |---|---|---|
 | `gemini` | Review — cross-model | Gemini CLI |
 | `codex` | Review — cross-model | **Only use as fallback.** If `codex:review` or `codex:rescue` skills were detected in Step 1, the codex-plugin-cc is installed — prefer `codex:review` over bare CLI. Only map to `codex-cli` if the plugin skills are NOT detected. |
+| `maestro` | Review — E2E (mobile) | Maestro E2E framework — supports iOS + Android |
+| `pluginval` | Review — E2E (audio-plugin) | Tracktion pluginval — plugin format compliance testing |
 
 > **Note:** Playwright is now a Claude Code plugin (not an npm package). It is detected in Step 1 via MCP tool names (`mcp__plugin_playwright_playwright__*`).
 
@@ -246,7 +256,14 @@ Merge results from Steps 1-3 into a single map:
     "cleanup": ["superpowers:/simplify"],
     "peer-review": ["gstack:/review", "superpowers:peer-reviewer"],
     "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
-    "e2e": ["gstack:/qa", "playwright"]
+    "e2e": {
+      "detected_platforms": ["web", "ios", "android"],
+      "tools": {
+        "web": ["gstack:/qa", "playwright"],
+        "ios": ["mobile-mcp", "ios-simulator-mcp", "maestro"],
+        "android": ["mobile-mcp", "maestro"]
+      }
+    }
   }
 }
 ```
@@ -357,13 +374,114 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 
 #### Review — E2E
 
-> **E2E verification** — proves the feature actually works end-to-end.
+E2E is **platform-aware**. Instead of picking one tool, first detect the project's target platform(s), then select a tool per platform.
+
+##### Step 1: Platform Discovery
+
+Auto-detect platforms by scanning for marker files. Check all — a project can target multiple platforms.
+
+| Marker Files | Platform |
+|---|---|
+| `next.config.*`, `vite.config.*`, `webpack.config.*`, `index.html` + `package.json` | `web` |
+| `*.xcodeproj`, `*.xcworkspace`, `ios/`, `Podfile` | `ios` |
+| `android/`, `build.gradle`, `settings.gradle` | `android` |
+| `electron-builder.*`, `electron.vite.*`, `electron/`, `main.js` + `"electron"` in package.json | `electron` |
+| `tauri.conf.json`, `src-tauri/` | `tauri` |
+| `pubspec.yaml` + (`windows/` or `macos/` or `linux/`) | `flutter-desktop` |
+| `*.jucer`, `CMakeLists.txt` + JUCE in cmake, `JuceLibraryCode/` | `audio-plugin` |
+| No UI markers, only server/API code | `api` |
+| CLI entry point (`bin/`, `cli.*`, `"bin"` in package.json) | `cli` |
+
+Present findings to the user:
+
+```
+DETECTED PLATFORMS
+┌───┬─────────────────┬──────────────────────────────────┐
+│ # │ Platform        │ Evidence                         │
+├───┼─────────────────┼──────────────────────────────────┤
+│ 1 │ web             │ next.config.ts found             │
+│ 2 │ ios             │ ios/ directory found             │
+│ 3 │ android         │ android/ directory found         │
+└───┴─────────────────┴──────────────────────────────────┘
+
+  Does this look right? (y/n, or add/remove platforms)
+```
+
+If no platforms detected, ask: "What platforms does this project target? (web, ios, android, electron, tauri, flutter-desktop, audio-plugin, api, cli)"
+
+##### Step 2: Tool Selection Per Platform
+
+For each detected platform, show available tools:
+
+> **E2E — web** — browser-based verification.
 >
 > | # | Status | Tool | Description | Install |
 > |---|--------|------|-------------|---------|
-> | 1 | ✅/⬜ | **gstack /qa** | Systematic QA testing with headless browser, finds + fixes bugs | Add gstack as plugin — see https://github.com/garrytan/gstack |
-> | 2 | ✅/⬜ | **Playwright** | Browser automation for E2E tests (Claude Code plugin with MCP tools) | `/plugin install playwright@claude-plugins-official` |
-> | 3 | ✅ | **built-in** | Run init script + test suite + health check | Always available |
+> | 1 | ✅/⬜ | **gstack /qa** | Systematic QA with headless browser, finds + fixes bugs | Add gstack as plugin — see https://github.com/garrytan/gstack |
+> | 2 | ✅/⬜ | **Playwright** | Browser automation (Claude Code plugin with MCP tools) | `/plugin install playwright@claude-plugins-official` |
+> | 3 | ✅ | **built-in** | Run test suite + curl health endpoint | Always available |
+
+> **E2E — ios** — iOS simulator/device verification.
+>
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **mobile-mcp** | Unified iOS+Android MCP — simulators + real devices, a11y-based | `npx -y @mobilenext/mobile-mcp@latest` (add as MCP server) |
+> | 2 | ✅/⬜ | **ios-simulator-mcp** | iOS simulator MCP — screenshots, tap, type, swipe | `npx -y ios-simulator-mcp` (add as MCP server) |
+> | 3 | ✅/⬜ | **Maestro** | YAML-based E2E flows, cross-platform, official MCP | `curl -fsSL "https://get.maestro.mobile.dev" \| bash` |
+> | 4 | ✅ | **built-in** | Run test suite (`xcodebuild test`) | Always available |
+
+> **E2E — android** — Android emulator/device verification.
+>
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **mobile-mcp** | Unified iOS+Android MCP — emulators + real devices, a11y-based | `npx -y @mobilenext/mobile-mcp@latest` (add as MCP server) |
+> | 2 | ✅/⬜ | **Maestro** | YAML-based E2E flows, cross-platform, official MCP | `curl -fsSL "https://get.maestro.mobile.dev" \| bash` |
+> | 3 | ✅ | **built-in** | Run test suite (`./gradlew connectedAndroidTest`) | Always available |
+
+> **E2E — electron** — Electron desktop app verification.
+>
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **electron-playwright-mcp** | A11y-first Electron automation via Playwright | Add MCP server — see https://github.com/fracalo/electron-playwright-mcp |
+> | 2 | ✅/⬜ | **Playwright** | `_electron.launch()` for full Electron control | `/plugin install playwright@claude-plugins-official` |
+> | 3 | ✅ | **built-in** | Run test suite + launch app + verify window | Always available |
+
+> **E2E — tauri** — Tauri desktop app verification.
+>
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **tauri-plugin-mcp** | Screenshots, DOM inspection, input simulation for Tauri v2 | Add MCP server — see https://github.com/P3GLEG/tauri-plugin-mcp |
+> | 2 | ✅/⬜ | **Playwright (Windows only)** | Attach to WebView2 via CDP (`connectOverCDP`) | `/plugin install playwright@claude-plugins-official` |
+> | 3 | ✅ | **built-in** | Run test suite (`cargo test`) + launch app | Always available |
+
+> **E2E — flutter-desktop** — Flutter desktop app verification.
+>
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **Patrol** | Extended integration_test with native view testing, sharding | Add `patrol` to `dev_dependencies` in pubspec.yaml |
+> | 2 | ✅ | **built-in** | `flutter test integration_test/` | Always available |
+
+> **E2E — audio-plugin** — JUCE/audio plugin verification.
+>
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **pluginval** | Plugin format compliance, crash detection, param fuzz testing (strictness 1-10) | Download from https://github.com/Tracktion/pluginval/releases or build via CMake |
+> | 2 | ✅/⬜ | **Playwright (webview UI, Windows only)** | Attach to JUCE WebView2 via CDP for UI testing | `/plugin install playwright@claude-plugins-official` |
+> | 3 | ✅ | **built-in** | Run test suite (Catch2/GoogleTest via `ctest` or `cmake --build . --target test`) | Always available |
+>
+> **Note:** For JUCE webview UIs, the JS frontend can also be tested independently with Playwright against a dev server (all platforms). Only attaching to the webview inside the running plugin requires Windows + WebView2 CDP.
+
+> **E2E — api** — API/backend verification.
+>
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅ | **built-in** | Run test suite + `curl` health/root endpoint + verify HTTP 200 | Always available |
+
+> **E2E — cli** — CLI tool verification.
+>
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅ | **built-in** | Invoke with `--help` or basic args + verify exit code 0 | Always available |
 
 ### Install-on-demand flow
 
@@ -386,6 +504,13 @@ If the user picks a tool marked ⬜ (not installed):
 | gstack | https://github.com/garrytan/gstack |
 | OpenSpec | https://github.com/openspec/openspec |
 | Gemini CLI | https://github.com/google/gemini-cli |
+| mobile-mcp | https://github.com/mobile-next/mobile-mcp |
+| ios-simulator-mcp | https://github.com/joshuayoes/ios-simulator-mcp |
+| Maestro | https://github.com/mobile-dev-inc/maestro |
+| electron-playwright-mcp | https://github.com/fracalo/electron-playwright-mcp |
+| tauri-plugin-mcp | https://github.com/P3GLEG/tauri-plugin-mcp |
+| pluginval | https://github.com/Tracktion/pluginval |
+| Patrol | https://github.com/leancodepl/patrol |
 
 Do NOT silently skip uninstalled tools or auto-fallback to built-in.
 
@@ -429,14 +554,18 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
     "tools": {
       "cleanup": "built-in",
       "peer-review": "built-in",
-      "cross-model": null,
-      "e2e": "built-in"
+      "cross-model": null
+    },
+    "e2e": {
+      "platforms": {
+        "web": { "tool": "playwright", "alternatives": ["gstack:/qa", "built-in"] },
+        "ios": { "tool": "mobile-mcp", "alternatives": ["ios-simulator-mcp", "maestro", "built-in"] }
+      }
     },
     "alternatives": {
       "cleanup": ["superpowers:/simplify"],
       "peer-review": ["gstack:/review", "superpowers:peer-reviewer"],
-      "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
-      "e2e": ["gstack:/qa", "playwright"]
+      "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"]
     },
     "profiles": {
       "full":     { "cleanup": true,  "peer-review": "full",    "cross-model": true,  "e2e": true  },
@@ -469,8 +598,12 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
 | `profile.adaptive_rules` | object | Maps feature priority ranges to profiles |
 | `profile.bump_rules` | object | Conditions that override the adaptive selection |
 | `review.layers` | string[] | Fixed: `["cleanup", "peer-review", "cross-model", "e2e"]` |
-| `review.tools` | object | Per-layer tool choice; `null` means layer is skipped |
-| `review.alternatives` | object | Per-layer list of known tools |
+| `review.tools` | object | Per-layer tool choice (cleanup, peer-review, cross-model); `null` means layer is skipped |
+| `review.e2e` | object | Platform-aware E2E configuration (see below) |
+| `review.e2e.platforms` | object | Map of platform → `{ tool, alternatives }`. Valid platforms: `web`, `ios`, `android`, `electron`, `tauri`, `flutter-desktop`, `audio-plugin`, `api`, `cli` |
+| `review.e2e.platforms.<platform>.tool` | string | Selected E2E tool for this platform, or `"built-in"` |
+| `review.e2e.platforms.<platform>.alternatives` | string[] | Other known tools for this platform |
+| `review.alternatives` | object | Per-layer list of known tools (cleanup, peer-review, cross-model) |
 | `review.profiles` | object | Per-profile layer config: `true`/`false`/`"full"`/`"top5"`/`"verdict"` |
 | `scope_rule` | string | `"one-feature-per-session"` |
 | `exit_rule` | string | `"merge-ready"` |

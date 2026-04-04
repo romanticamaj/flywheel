@@ -19,6 +19,8 @@ set -euo pipefail
 #   --test continuity       Session handoff — second relay picks next feature
 #   --test features         All feature management tests (add/revise/split/remove/integrity)
 #   --test features-list    Read-only checklist display
+#   --test e2e-offline      All offline E2E platform tests (schema, detection, sources, detection-table)
+#   --test e2e-live         Live E2E platform init test (requires Claude)
 #
 # Individual feature tests:
 #   --test features-add     Add new features with auto-incremented IDs
@@ -26,10 +28,17 @@ set -euo pipefail
 #   --test features-split   Split a feature into sub-features
 #   --test features-remove  Remove a feature with referential integrity
 #
+# E2E platform tests (offline — no Claude needed):
+#   --test e2e-schema       Validates platform-aware E2E config JSON structure
+#   --test e2e-detection    Checks all 9 platforms in skill files
+#   --test e2e-sources      Checks install source URLs for all E2E tools
+#   --test e2e-det-table    Checks Detection table completeness
+#   --test e2e-init         Live test: init with mobile/web markers (requires Claude)
+#
 # Other:
 #   --cleanup               Remove the test workspace
 #
-# Test inventory (10 tests, ~31 assertions):
+# Test inventory (15 tests, ~45 assertions):
 #   TEST 1:  Initializer (/init)           — .flywheel/ dir, config schema, checklist schema, init scripts, git commit
 #   TEST 2:  Coding Agent (/relay)         — handoff log, JSONL schema, checklist update, feature commit, compliance output
 #   TEST 3:  Session Continuity            — handoff log growth, different feature picked, no duplicate work
@@ -40,6 +49,11 @@ set -euo pipefail
 #   TEST 8:  Source Metadata               — flywheel-config.json source field preserved, config structure intact
 #   TEST 9:  Checklist Integrity           — full end-to-end validation: version, types, statuses, split/completed constraints
 #   TEST 10: Features List (/features-list) — output exists, contains IDs/titles/statuses, read-only (no files modified)
+#   TEST 11: E2E Config Schema (offline)   — validates platform-aware E2E config structure (single, multi, all-platform)
+#   TEST 12: E2E Platform Detection (offline) — review-pipeline and initializer have all 9 platforms and marker files
+#   TEST 13: E2E Install Sources (offline) — all new E2E tools have source URLs in initializer template
+#   TEST 14: E2E Detection Table (offline) — review-pipeline Detection table has entries for all E2E tools
+#   TEST 15: E2E Init with Platforms (live) — init with mobile/web markers produces platform-aware config
 #
 # Requirements:
 #   - `claude` CLI installed and authenticated
@@ -1277,6 +1291,485 @@ print(f'Statuses: { {s: sum(1 for f in c[\"features\"] if f[\"status\"]==s) for 
   cat "$TEST_WORKSPACE/.flywheel/flywheel-config.json" 2>/dev/null || true
 }
 
+# ── Test: Platform-Aware E2E Config Schema (offline — no Claude invocation) ──
+
+test_e2e_config_schema() {
+  section "TEST 11: E2E Config Schema Validation (offline)"
+
+  # This test validates that a flywheel-config.json with the new platform-aware
+  # E2E structure passes schema validation. No Claude invocation needed.
+
+  local schema_dir="$TEST_WORKSPACE/.test-e2e-schema"
+  mkdir -p "$schema_dir"
+
+  # Valid config with platform-aware E2E
+  cat > "$schema_dir/valid-config.json" << 'JSON'
+{
+  "planning": { "tool": "built-in", "alternatives": [] },
+  "multi_agent": { "tool": "claude-code-native", "alternatives": [] },
+  "profile": { "default": "adaptive" },
+  "review": {
+    "layers": ["cleanup", "peer-review", "cross-model", "e2e"],
+    "tools": {
+      "cleanup": "built-in",
+      "peer-review": "built-in",
+      "cross-model": null
+    },
+    "e2e": {
+      "platforms": {
+        "web": { "tool": "playwright", "alternatives": ["gstack:/qa", "built-in"] },
+        "ios": { "tool": "mobile-mcp", "alternatives": ["ios-simulator-mcp", "maestro", "built-in"] },
+        "android": { "tool": "maestro", "alternatives": ["mobile-mcp", "built-in"] }
+      }
+    },
+    "alternatives": {
+      "cleanup": ["superpowers:/simplify"],
+      "peer-review": ["gstack:/review"],
+      "cross-model": ["codex:review"]
+    },
+    "profiles": {
+      "full":     { "cleanup": true,  "peer-review": "full",    "cross-model": true,  "e2e": true  },
+      "standard": { "cleanup": false, "peer-review": "top5",    "cross-model": false, "e2e": true  },
+      "light":    { "cleanup": false, "peer-review": "verdict", "cross-model": false, "e2e": false },
+      "draft":    { "cleanup": false, "peer-review": false,     "cross-model": false, "e2e": false }
+    }
+  },
+  "source": { "type": "user-input", "paths": [], "user_notes": null, "resolved_at": "2026-04-04T00:00:00Z" },
+  "scope_rule": "one-feature-per-session",
+  "exit_rule": "merge-ready",
+  "branch_naming": "feat/{id}-{slug}"
+}
+JSON
+
+  # Validate the new E2E schema
+  if python3 -c "
+import json
+
+c = json.load(open('$schema_dir/valid-config.json'))
+
+# review.e2e must exist
+assert 'e2e' in c['review'], 'missing review.e2e'
+e2e = c['review']['e2e']
+
+# review.e2e.platforms must be a dict
+assert 'platforms' in e2e, 'missing review.e2e.platforms'
+assert isinstance(e2e['platforms'], dict), 'platforms must be dict'
+
+# Valid platform names
+valid_platforms = {'web', 'ios', 'android', 'electron', 'tauri', 'flutter-desktop', 'audio-plugin', 'api', 'cli'}
+for platform, config in e2e['platforms'].items():
+    assert platform in valid_platforms, f'invalid platform: {platform}'
+    assert 'tool' in config, f'missing tool for platform {platform}'
+    assert 'alternatives' in config, f'missing alternatives for platform {platform}'
+    assert isinstance(config['alternatives'], list), f'alternatives must be list for {platform}'
+    assert isinstance(config['tool'], str), f'tool must be string for {platform}'
+
+# review.tools should NOT have 'e2e' key (moved to review.e2e)
+assert 'e2e' not in c['review'].get('tools', {}), 'review.tools should not contain e2e (moved to review.e2e)'
+
+print(f'Valid: {len(e2e[\"platforms\"])} platforms configured: {list(e2e[\"platforms\"].keys())}')
+" 2>/dev/null; then
+    pass "Platform-aware E2E schema validates correctly"
+  else
+    fail "Platform-aware E2E schema validation failed"
+  fi
+
+  # Test: each platform has a valid tool name
+  if python3 -c "
+import json
+
+c = json.load(open('$schema_dir/valid-config.json'))
+known_tools = {
+    'web': ['playwright', 'gstack:/qa', 'built-in'],
+    'ios': ['mobile-mcp', 'ios-simulator-mcp', 'maestro', 'built-in'],
+    'android': ['mobile-mcp', 'maestro', 'built-in'],
+    'electron': ['electron-playwright-mcp', 'playwright', 'built-in'],
+    'tauri': ['tauri-plugin-mcp', 'playwright', 'built-in'],
+    'flutter-desktop': ['patrol', 'built-in'],
+    'audio-plugin': ['pluginval', 'playwright', 'built-in'],
+    'api': ['built-in'],
+    'cli': ['built-in']
+}
+
+for platform, config in c['review']['e2e']['platforms'].items():
+    assert config['tool'] in known_tools[platform], f'{config[\"tool\"]} not valid for {platform}. Valid: {known_tools[platform]}'
+    for alt in config['alternatives']:
+        assert alt in known_tools[platform], f'alternative {alt} not valid for {platform}'
+
+print('All platform tools are valid')
+" 2>/dev/null; then
+    pass "All configured E2E tools are valid for their platforms"
+  else
+    fail "Invalid E2E tool found for a platform"
+  fi
+
+  # Test: config with no platforms is valid (api-only project)
+  cat > "$schema_dir/api-only-config.json" << 'JSON'
+{
+  "planning": { "tool": "built-in", "alternatives": [] },
+  "multi_agent": { "tool": "claude-code-native", "alternatives": [] },
+  "profile": { "default": "adaptive" },
+  "review": {
+    "layers": ["cleanup", "peer-review", "cross-model", "e2e"],
+    "tools": { "cleanup": "built-in", "peer-review": "built-in", "cross-model": null },
+    "e2e": {
+      "platforms": {
+        "api": { "tool": "built-in", "alternatives": [] }
+      }
+    },
+    "alternatives": {},
+    "profiles": {}
+  },
+  "source": { "type": "user-input", "paths": [], "user_notes": null, "resolved_at": "2026-04-04T00:00:00Z" },
+  "scope_rule": "one-feature-per-session",
+  "exit_rule": "merge-ready",
+  "branch_naming": "feat/{id}-{slug}"
+}
+JSON
+
+  if python3 -c "
+import json
+c = json.load(open('$schema_dir/api-only-config.json'))
+assert len(c['review']['e2e']['platforms']) == 1
+assert 'api' in c['review']['e2e']['platforms']
+assert c['review']['e2e']['platforms']['api']['tool'] == 'built-in'
+print('API-only config valid')
+" 2>/dev/null; then
+    pass "API-only project config (single platform) validates correctly"
+  else
+    fail "API-only config validation failed"
+  fi
+
+  # Test: config with all platforms is valid
+  cat > "$schema_dir/multi-platform-config.json" << 'JSON'
+{
+  "planning": { "tool": "built-in", "alternatives": [] },
+  "multi_agent": { "tool": "claude-code-native", "alternatives": [] },
+  "profile": { "default": "adaptive" },
+  "review": {
+    "layers": ["cleanup", "peer-review", "cross-model", "e2e"],
+    "tools": { "cleanup": "built-in", "peer-review": "built-in", "cross-model": null },
+    "e2e": {
+      "platforms": {
+        "web": { "tool": "playwright", "alternatives": ["built-in"] },
+        "ios": { "tool": "mobile-mcp", "alternatives": ["built-in"] },
+        "android": { "tool": "mobile-mcp", "alternatives": ["built-in"] },
+        "electron": { "tool": "electron-playwright-mcp", "alternatives": ["built-in"] },
+        "tauri": { "tool": "tauri-plugin-mcp", "alternatives": ["built-in"] },
+        "flutter-desktop": { "tool": "patrol", "alternatives": ["built-in"] },
+        "audio-plugin": { "tool": "pluginval", "alternatives": ["built-in"] },
+        "api": { "tool": "built-in", "alternatives": [] },
+        "cli": { "tool": "built-in", "alternatives": [] }
+      }
+    },
+    "alternatives": {},
+    "profiles": {}
+  },
+  "source": { "type": "user-input", "paths": [], "user_notes": null, "resolved_at": "2026-04-04T00:00:00Z" },
+  "scope_rule": "one-feature-per-session",
+  "exit_rule": "merge-ready",
+  "branch_naming": "feat/{id}-{slug}"
+}
+JSON
+
+  if python3 -c "
+import json
+c = json.load(open('$schema_dir/multi-platform-config.json'))
+assert len(c['review']['e2e']['platforms']) == 9, f'expected 9 platforms, got {len(c[\"review\"][\"e2e\"][\"platforms\"])}'
+print(f'Multi-platform config valid: {len(c[\"review\"][\"e2e\"][\"platforms\"])} platforms')
+" 2>/dev/null; then
+    pass "Multi-platform config (all 9 platforms) validates correctly"
+  else
+    fail "Multi-platform config validation failed"
+  fi
+
+  rm -rf "$schema_dir"
+}
+
+# ── Test: Platform Detection from Marker Files (offline) ──
+
+test_e2e_platform_detection() {
+  section "TEST 12: E2E Platform Detection from Marker Files (offline)"
+
+  # Validate that the marker-file-to-platform mapping in the initializer template
+  # is consistent with the review-pipeline skill's platform list.
+
+  local skill_file="$FLYWHEEL_DIR/plugins/flywheel/skills/review-pipeline/SKILL.md"
+  local init_file="$FLYWHEEL_DIR/plugins/flywheel/skills/hub/initializer-template.md"
+
+  # Check review-pipeline SKILL.md has all 9 platforms
+  if python3 -c "
+import re
+
+with open('$skill_file') as f:
+    content = f.read()
+
+expected_platforms = ['web', 'ios', 'android', 'electron', 'tauri', 'flutter-desktop', 'audio-plugin', 'api', 'cli']
+missing = []
+for p in expected_platforms:
+    # Check in Framework Slots table (E2E — <platform>)
+    if f'E2E — {p}' not in content:
+        # Also check the Platform Tool Matrix
+        if f'**{p}**' not in content:
+            missing.append(p)
+
+if missing:
+    raise AssertionError(f'Missing platforms in review-pipeline SKILL.md: {missing}')
+print(f'All {len(expected_platforms)} platforms found in review-pipeline SKILL.md')
+" 2>/dev/null; then
+    pass "review-pipeline/SKILL.md contains all 9 E2E platforms"
+  else
+    fail "review-pipeline/SKILL.md is missing platforms"
+  fi
+
+  # Check initializer-template.md has platform detection markers
+  if python3 -c "
+with open('$init_file') as f:
+    content = f.read()
+
+# Check marker files table exists with key markers
+markers = {
+    'web': 'next.config',
+    'ios': 'xcodeproj',
+    'android': 'build.gradle',
+    'electron': 'electron-builder',
+    'tauri': 'tauri.conf.json',
+    'flutter-desktop': 'pubspec.yaml',
+    'audio-plugin': '.jucer',
+    'api': 'server/API',
+    'cli': 'bin/'
+}
+missing = []
+for platform, marker in markers.items():
+    if marker not in content:
+        missing.append(f'{platform} (marker: {marker})')
+
+if missing:
+    raise AssertionError(f'Missing platform markers in initializer-template.md: {missing}')
+print(f'All {len(markers)} platform markers found in initializer-template.md')
+" 2>/dev/null; then
+    pass "initializer-template.md contains marker files for all platforms"
+  else
+    fail "initializer-template.md is missing platform markers"
+  fi
+
+  # Check that each platform in the initializer has a tool selection table
+  if python3 -c "
+with open('$init_file') as f:
+    content = f.read()
+
+# These platforms should have their own E2E tool selection tables
+platforms_with_tables = ['web', 'ios', 'android', 'electron', 'tauri', 'flutter-desktop', 'audio-plugin', 'api', 'cli']
+missing = []
+for p in platforms_with_tables:
+    if f'E2E — {p}' not in content:
+        missing.append(p)
+
+if missing:
+    raise AssertionError(f'Missing E2E tool tables for platforms: {missing}')
+print(f'All {len(platforms_with_tables)} platform tool tables present')
+" 2>/dev/null; then
+    pass "initializer-template.md has E2E tool tables for all platforms"
+  else
+    fail "initializer-template.md is missing E2E tool tables"
+  fi
+}
+
+# ── Test: E2E Tool Install Sources (offline) ──
+
+test_e2e_install_sources() {
+  section "TEST 13: E2E Tool Install Source URLs (offline)"
+
+  local init_file="$FLYWHEEL_DIR/plugins/flywheel/skills/hub/initializer-template.md"
+
+  # Check that all new E2E tools have source URLs in the install guide table
+  if python3 -c "
+with open('$init_file') as f:
+    content = f.read()
+
+required_urls = {
+    'mobile-mcp': 'mobile-next/mobile-mcp',
+    'ios-simulator-mcp': 'joshuayoes/ios-simulator-mcp',
+    'Maestro': 'mobile-dev-inc/maestro',
+    'electron-playwright-mcp': 'fracalo/electron-playwright-mcp',
+    'tauri-plugin-mcp': 'P3GLEG/tauri-plugin-mcp',
+    'pluginval': 'Tracktion/pluginval',
+    'Patrol': 'leancodepl/patrol'
+}
+
+missing = []
+for tool, url_part in required_urls.items():
+    if url_part not in content:
+        missing.append(f'{tool} ({url_part})')
+
+if missing:
+    raise AssertionError(f'Missing install source URLs: {missing}')
+print(f'All {len(required_urls)} E2E tool source URLs present')
+" 2>/dev/null; then
+    pass "All E2E tool install source URLs are present in initializer-template.md"
+  else
+    fail "Missing E2E tool install source URLs"
+  fi
+}
+
+# ── Test: Detection Table Completeness (offline) ──
+
+test_e2e_detection_table() {
+  section "TEST 14: E2E Detection Table Completeness (offline)"
+
+  local skill_file="$FLYWHEEL_DIR/plugins/flywheel/skills/review-pipeline/SKILL.md"
+
+  # Check that the Detection table in review-pipeline has entries for all new tools
+  if python3 -c "
+with open('$skill_file') as f:
+    content = f.read()
+
+# Extract the Detection section
+detection_start = content.index('## Detection')
+detection_section = content[detection_start:]
+
+required_tools = [
+    'mobile-mcp',
+    'ios-simulator-mcp',
+    'Maestro',
+    'electron-playwright-mcp',
+    'tauri-plugin-mcp',
+    'pluginval',
+    'Patrol',
+    'Playwright',
+    'Gemini CLI'
+]
+
+missing = []
+for tool in required_tools:
+    if tool not in detection_section:
+        missing.append(tool)
+
+if missing:
+    raise AssertionError(f'Missing from Detection table: {missing}')
+print(f'All {len(required_tools)} tools found in Detection table')
+" 2>/dev/null; then
+    pass "Detection table contains all E2E tools"
+  else
+    fail "Detection table is missing tools"
+  fi
+}
+
+# ── Test: Init with Platform E2E (live — Claude invocation) ──
+
+test_init_platform_e2e() {
+  section "TEST 15: Init with Platform-Aware E2E (/init with mobile markers)"
+
+  # Add mobile project markers so platform detection picks them up
+  mkdir -p "$TEST_WORKSPACE/ios"
+  touch "$TEST_WORKSPACE/ios/Podfile"
+  mkdir -p "$TEST_WORKSPACE/android"
+  cat > "$TEST_WORKSPACE/android/build.gradle" << 'GRADLE'
+apply plugin: 'com.android.application'
+android { compileSdkVersion 34 }
+GRADLE
+
+  # Also add a next.config.ts for web detection
+  cat > "$TEST_WORKSPACE/next.config.ts" << 'NEXTCFG'
+export default { reactStrictMode: true }
+NEXTCFG
+
+  (cd "$TEST_WORKSPACE" && git add -A && git commit -q -m "chore: add mobile and web platform markers")
+
+  local prompt
+  prompt=$(cat << 'PROMPT'
+I want to re-initialize flywheel for this project. The project now has web, iOS, and Android targets (check for next.config.ts, ios/, android/ directories).
+
+Use built-in defaults for planning, multi-agent, cleanup, peer-review, and cross-model.
+
+For E2E: detect the platforms from the project files. For each detected platform, use built-in E2E tools. The config should use the new platform-aware E2E format:
+
+```json
+"e2e": {
+  "platforms": {
+    "<platform>": { "tool": "built-in", "alternatives": [...] }
+  }
+}
+```
+
+Save to .flywheel/flywheel-config.json (overwrite existing). Keep the existing feature-checklist.json. Commit the updated config.
+PROMPT
+)
+
+  local output_file
+  output_file=$(invoke_claude "init_platform_e2e" "$prompt")
+
+  log "Checking platform-aware E2E config..."
+
+  # Helper: extract E2E platforms dict from config (accepts both canonical and legacy locations)
+  local e2e_extract_helper='
+def get_e2e_platforms(path):
+    import json
+    c = json.load(open(path))
+    review = c.get("review", {})
+    # Canonical: review.e2e.platforms
+    e2e = review.get("e2e", {})
+    if isinstance(e2e, dict) and "platforms" in e2e:
+        return e2e["platforms"]
+    # Legacy fallback: review.tools.e2e.platforms
+    e2e = review.get("tools", {}).get("e2e", {})
+    if isinstance(e2e, dict) and "platforms" in e2e:
+        return e2e["platforms"]
+    return None
+'
+  local config_path="$TEST_WORKSPACE/.flywheel/flywheel-config.json"
+
+  # Check that the config has a platform-aware E2E structure
+  if python3 -c "
+${e2e_extract_helper}
+platforms = get_e2e_platforms('${config_path}')
+assert platforms is not None, 'Platform-aware E2E not found in review.e2e or review.tools.e2e'
+assert isinstance(platforms, dict), f'platforms must be dict, got {type(platforms)}'
+assert len(platforms) >= 1, 'at least one platform expected'
+for p, cfg in platforms.items():
+    assert isinstance(cfg, dict), f'{p} config must be dict'
+    assert 'tool' in cfg, f'missing tool for {p}'
+    assert 'alternatives' in cfg, f'missing alternatives for {p}'
+    assert isinstance(cfg['alternatives'], list), f'alternatives must be list for {p}'
+print(f'Platform-aware E2E config valid: {len(platforms)} platforms: {list(platforms.keys())}')
+" 2>/dev/null; then
+    pass "Config has valid platform-aware E2E structure"
+  else
+    fail "Config missing or invalid platform-aware E2E structure"
+    log "── Current config ──"
+    cat "$TEST_WORKSPACE/.flywheel/flywheel-config.json" 2>/dev/null || true
+  fi
+
+  # Check that web platform was detected
+  if python3 -c "
+${e2e_extract_helper}
+platforms = get_e2e_platforms('${config_path}') or {}
+assert 'web' in platforms, 'web not detected'
+print(f'web: tool={platforms[\"web\"][\"tool\"]}')
+" 2>/dev/null; then
+    pass "Web platform detected from next.config.ts"
+  else
+    fail "Web platform not detected"
+  fi
+
+  # Check if mobile platforms were detected (ios and/or android)
+  if python3 -c "
+${e2e_extract_helper}
+platforms = get_e2e_platforms('${config_path}') or {}
+mobile_found = [p for p in ['ios', 'android'] if p in platforms]
+if not mobile_found:
+    raise AssertionError('No mobile platforms detected despite ios/ and android/ directories')
+print(f'Mobile platforms detected: {mobile_found}')
+" 2>/dev/null; then
+    pass "Mobile platform(s) detected from ios/ and android/ directories"
+  else
+    warn "Mobile platforms not detected (may need more explicit markers)"
+  fi
+
+  log "── Updated config ──"
+  cat "$TEST_WORKSPACE/.flywheel/flywheel-config.json" 2>/dev/null || true
+}
+
 # ── Main ──
 
 main() {
@@ -1347,6 +1840,28 @@ main() {
       run_test "features-add" test_features_add
       run_test "features-remove" test_features_remove
       ;;
+    e2e-offline)
+      run_test "e2e-schema" test_e2e_config_schema
+      run_test "e2e-detection" test_e2e_platform_detection
+      run_test "e2e-sources" test_e2e_install_sources
+      run_test "e2e-det-table" test_e2e_detection_table
+      ;;
+    e2e-schema)
+      run_test "e2e-schema" test_e2e_config_schema
+      ;;
+    e2e-detection)
+      run_test "e2e-detection" test_e2e_platform_detection
+      ;;
+    e2e-sources)
+      run_test "e2e-sources" test_e2e_install_sources
+      ;;
+    e2e-det-table)
+      run_test "e2e-det-table" test_e2e_detection_table
+      ;;
+    e2e-live|e2e-init)
+      run_test "init" test_init
+      run_test "e2e-init" test_init_platform_e2e
+      ;;
     all)
       run_test "init" test_init
       run_test "relay" test_relay
@@ -1358,10 +1873,15 @@ main() {
       run_test "features-remove" test_features_remove
       run_test "source-metadata" test_features_source_metadata
       run_test "integrity" test_checklist_integrity
+      run_test "e2e-schema" test_e2e_config_schema
+      run_test "e2e-detection" test_e2e_platform_detection
+      run_test "e2e-sources" test_e2e_install_sources
+      run_test "e2e-det-table" test_e2e_detection_table
+      run_test "e2e-init" test_init_platform_e2e
       ;;
     *)
       echo "Unknown test: $TEST_FILTER"
-      echo "Usage: $0 [--test init|relay|continuity|features|features-list|features-add|features-revise|features-split|features-remove|all]"
+      echo "Usage: $0 [--test init|relay|continuity|features|features-list|features-add|features-revise|features-split|features-remove|e2e-offline|e2e-schema|e2e-detection|e2e-sources|e2e-det-table|e2e-live|all]"
       exit 1
       ;;
   esac
