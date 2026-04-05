@@ -15,7 +15,7 @@ set -euo pipefail
 # Test groups:
 #   --test all              Run all tests (default)
 #   --test init             Initializer — creates .flywheel/ artifacts
-#   --test relay            Coding agent — 9-step loop (depends on init)
+#   --test relay            Coding agent — 10-step loop (depends on init)
 #   --test continuity       Session handoff — second relay picks next feature
 #   --test features         All feature management tests (add/revise/split/remove/integrity)
 #   --test features-list    Read-only checklist display
@@ -47,7 +47,7 @@ set -euo pipefail
 #   TEST 6:  Features Split                — count grew, parent marked split, sub-features valid, no duplicate IDs
 #   TEST 7:  Features Remove               — count decreased, target gone, schema intact, IDs not renumbered, valid JSON
 #   TEST 8:  Source Metadata               — flywheel-config.json source field preserved, config structure intact
-#   TEST 9:  Checklist Integrity           — full end-to-end validation: version, types, statuses, split/completed constraints
+#   TEST 9:  Checklist Integrity           — full end-to-end validation: version, types, statuses, split/implemented/verified constraints
 #   TEST 10: Features List (/features-list) — output exists, contains IDs/titles/statuses, read-only (no files modified)
 #   TEST 11: E2E Config Schema (offline)   — validates platform-aware E2E config structure (single, multi, all-platform)
 #   TEST 12: E2E Platform Detection (offline) — review-pipeline and initializer have all 9 platforms and marker files
@@ -65,6 +65,7 @@ set -euo pipefail
 FLYWHEEL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TEST_WORKSPACE="/tmp/flywheel-test-$(date +%s)"
 RESULTS_DIR="$TEST_WORKSPACE/.test-results"
+LOG_FILE="/tmp/flywheel-test-latest.log"
 PASSED=0
 FAILED=0
 TEST_FILTER="all"
@@ -369,7 +370,7 @@ test_relay() {
 
   local prompt
   prompt=$(cat << 'PROMPT'
-Start a flywheel coding agent session. Follow the 9-step loop from the coding-agent-template.
+Start a flywheel coding agent session. Follow the 10-step loop from the coding-agent-template.
 
 Important constraints for this test:
 - For ALL review layers, use built-in defaults (do not try to invoke gstack or superpowers — they are not installed).
@@ -423,16 +424,15 @@ with open('$TEST_WORKSPACE/.flywheel/claude-progress.jsonl') as f:
   if python3 -c "
 import json
 c = json.load(open('$TEST_WORKSPACE/.flywheel/feature-checklist.json'))
-completed = [f for f in c['features'] if f['status'] == 'completed']
-if completed:
-    print(f'Completed: {completed[0][\"id\"]} — {completed[0][\"title\"]}')
-    assert completed[0].get('completed_by_session') is not None, 'missing completed_by_session'
+done = [f for f in c['features'] if f['status'] in ('completed', 'implemented', 'verified')]
+if done:
+    print(f'Done: {done[0][\"id\"]} — {done[0][\"title\"]} (status: {done[0][\"status\"]})')
 else:
-    raise AssertionError('No completed features')
+    raise AssertionError('No completed/implemented/verified features')
 " 2>/dev/null; then
-    pass "Feature checklist updated (at least one feature completed)"
+    pass "Feature checklist updated (at least one feature implemented)"
   else
-    fail "No feature marked as completed in checklist"
+    fail "No feature marked as completed/implemented in checklist"
   fi
 
   # Check that code was actually implemented
@@ -480,17 +480,17 @@ test_relay_continuity() {
   completed_count=$(python3 -c "
 import json
 c = json.load(open('$TEST_WORKSPACE/.flywheel/feature-checklist.json'))
-print(len([f for f in c['features'] if f['status'] == 'completed']))
+print(len([f for f in c['features'] if f['status'] in ('completed', 'implemented', 'verified')]))
 " 2>/dev/null || echo "0")
 
   if [[ "$completed_count" -lt 1 ]]; then
-    fail "Skipping continuity test — no completed features from first relay"
+    fail "Skipping continuity test — no completed/implemented features from first relay"
     return
   fi
 
   local prompt
   prompt=$(cat << 'PROMPT'
-Start a flywheel coding agent session. Follow the 9-step loop.
+Start a flywheel coding agent session. Follow the 10-step loop.
 
 This is NOT the first session — read the handoff log and checklist first. Pick the next uncompleted feature.
 
@@ -522,14 +522,14 @@ PROMPT
   new_completed=$(python3 -c "
 import json
 c = json.load(open('$TEST_WORKSPACE/.flywheel/feature-checklist.json'))
-completed = [f for f in c['features'] if f['status'] == 'completed']
-print(len(completed))
+done = [f for f in c['features'] if f['status'] in ('completed', 'implemented', 'verified')]
+print(len(done))
 " 2>/dev/null || echo "0")
 
   if [[ "$new_completed" -ge 2 ]]; then
-    pass "$new_completed features now completed (continuity works — picked next feature)"
+    pass "$new_completed features now done (continuity works — picked next feature)"
   else
-    fail "Only $new_completed features completed (expected >= 2 after second session)"
+    fail "Only $new_completed features done (expected >= 2 after second session)"
   fi
 
   # Verify the second handoff entry references a different feature
@@ -1185,6 +1185,7 @@ c = json.load(open('$TEST_WORKSPACE/.flywheel/flywheel-config.json'))
 assert 'planning' in c, 'missing planning'
 assert 'multi_agent' in c, 'missing multi_agent'
 assert 'review' in c, 'missing review'
+assert 'verification' in c, 'missing verification (v1.9.0: platform verification is top-level)'
 print('Config structure still valid')
 " 2>/dev/null; then
     pass "flywheel-config.json structure preserved through all feature operations"
@@ -1233,7 +1234,7 @@ assert isinstance(c['features'], list), 'features is not a list'
 
 # Feature-level validation
 ids = []
-valid_statuses = {'pending', 'in-progress', 'implemented', 'needs-fix', 'verified', 'completed', 'blocked', 'split'}
+valid_statuses = {'pending', 'in-progress', 'implemented', 'needs-fix', 'verified', 'blocked', 'split'}
 for f in c['features']:
     # Required fields
     assert 'id' in f, f'feature missing id: {f}'
@@ -1257,13 +1258,11 @@ for f in c['features']:
     if f['status'] == 'split':
         assert 'split_into' in f, f'split feature {f[\"id\"]} missing split_into'
 
-    # Completed/verified features must have a timestamp
-    if f['status'] == 'completed':
-        assert f.get('completed_by_session') is not None, f'completed feature {f[\"id\"]} missing completed_by_session'
-    if f['status'] == 'verified':
-        assert f.get('verified_at') is not None or f.get('completed_by_session') is not None, f'verified feature {f[\"id\"]} missing verified_at'
+    # Implemented/verified features must have a timestamp
     if f['status'] == 'implemented':
         assert f.get('implemented_at') is not None or f.get('completed_by_session') is not None, f'implemented feature {f[\"id\"]} missing timestamp'
+    if f['status'] == 'verified':
+        assert f.get('verified_at') is not None or f.get('completed_by_session') is not None, f'verified feature {f[\"id\"]} missing verified_at'
 
     ids.append(f['id'])
 
@@ -1306,7 +1305,7 @@ test_e2e_config_schema() {
   local schema_dir="$TEST_WORKSPACE/.test-e2e-schema"
   mkdir -p "$schema_dir"
 
-  # Valid config with platform-aware E2E
+  # Valid config with verification section (v1.9.0: platforms moved from review.e2e to verification.platforms)
   cat > "$schema_dir/valid-config.json" << 'JSON'
 {
   "planning": { "tool": "built-in", "alternatives": [] },
@@ -1317,25 +1316,33 @@ test_e2e_config_schema() {
     "tools": {
       "cleanup": "built-in",
       "peer-review": "built-in",
-      "cross-model": null
-    },
-    "e2e": {
-      "platforms": {
-        "web": { "tool": "playwright", "alternatives": ["gstack:/qa", "built-in"] },
-        "ios": { "tool": "mobile-mcp", "alternatives": ["ios-simulator-mcp", "maestro", "built-in"] },
-        "android": { "tool": "maestro", "alternatives": ["mobile-mcp", "built-in"] }
-      }
+      "cross-model": null,
+      "e2e": "built-in"
     },
     "alternatives": {
       "cleanup": ["superpowers:/simplify"],
       "peer-review": ["gstack:/review"],
-      "cross-model": ["codex:review"]
+      "cross-model": ["codex:review"],
+      "e2e": ["gstack:/qa"]
     },
     "profiles": {
       "full":     { "cleanup": true,  "peer-review": "full",    "cross-model": true,  "e2e": true  },
       "standard": { "cleanup": false, "peer-review": "top5",    "cross-model": false, "e2e": true  },
       "light":    { "cleanup": false, "peer-review": "verdict", "cross-model": false, "e2e": false },
       "draft":    { "cleanup": false, "peer-review": false,     "cross-model": false, "e2e": false }
+    }
+  },
+  "verification": {
+    "platforms": {
+      "web": { "tool": "playwright", "alternatives": ["gstack:/qa", "built-in"] },
+      "ios": { "tool": "mobile-mcp", "alternatives": ["ios-simulator-mcp", "maestro", "built-in"] },
+      "android": { "tool": "maestro", "alternatives": ["mobile-mcp", "built-in"] }
+    },
+    "profiles": {
+      "full":     { "run": "all-platforms" },
+      "standard": { "run": "primary-only" },
+      "light":    { "run": "built-in-only" },
+      "draft":    { "run": "none" }
     }
   },
   "source": { "type": "user-input", "paths": [], "user_notes": null, "resolved_at": "2026-04-04T00:00:00Z" },
@@ -1345,37 +1352,43 @@ test_e2e_config_schema() {
 }
 JSON
 
-  # Validate the new E2E schema
+  # Validate the verification schema
   if python3 -c "
 import json
 
 c = json.load(open('$schema_dir/valid-config.json'))
 
-# review.e2e must exist
-assert 'e2e' in c['review'], 'missing review.e2e'
-e2e = c['review']['e2e']
+# verification must exist as top-level key
+assert 'verification' in c, 'missing verification section'
+v = c['verification']
 
-# review.e2e.platforms must be a dict
-assert 'platforms' in e2e, 'missing review.e2e.platforms'
-assert isinstance(e2e['platforms'], dict), 'platforms must be dict'
+# verification.platforms must be a dict
+assert 'platforms' in v, 'missing verification.platforms'
+assert isinstance(v['platforms'], dict), 'platforms must be dict'
 
 # Valid platform names
 valid_platforms = {'web', 'ios', 'android', 'electron', 'tauri', 'flutter-desktop', 'audio-plugin', 'api', 'cli'}
-for platform, config in e2e['platforms'].items():
+for platform, config in v['platforms'].items():
     assert platform in valid_platforms, f'invalid platform: {platform}'
     assert 'tool' in config, f'missing tool for platform {platform}'
     assert 'alternatives' in config, f'missing alternatives for platform {platform}'
     assert isinstance(config['alternatives'], list), f'alternatives must be list for {platform}'
     assert isinstance(config['tool'], str), f'tool must be string for {platform}'
 
-# review.tools should NOT have 'e2e' key (moved to review.e2e)
-assert 'e2e' not in c['review'].get('tools', {}), 'review.tools should not contain e2e (moved to review.e2e)'
+# verification.profiles must exist
+assert 'profiles' in v, 'missing verification.profiles'
+for profile in ['full', 'standard', 'light', 'draft']:
+    assert profile in v['profiles'], f'missing profile: {profile}'
+    assert 'run' in v['profiles'][profile], f'missing run in profile {profile}'
 
-print(f'Valid: {len(e2e[\"platforms\"])} platforms configured: {list(e2e[\"platforms\"].keys())}')
+# review.tools.e2e should exist as code review E2E (separate from verification)
+assert 'e2e' in c['review'].get('tools', {}), 'review.tools.e2e should exist for code review E2E layer'
+
+print(f'Valid: {len(v[\"platforms\"])} platforms configured: {list(v[\"platforms\"].keys())}')
 " 2>/dev/null; then
-    pass "Platform-aware E2E schema validates correctly"
+    pass "Verification schema validates correctly"
   else
-    fail "Platform-aware E2E schema validation failed"
+    fail "Verification schema validation failed"
   fi
 
   # Test: each platform has a valid tool name
@@ -1395,16 +1408,16 @@ known_tools = {
     'cli': ['built-in']
 }
 
-for platform, config in c['review']['e2e']['platforms'].items():
+for platform, config in c['verification']['platforms'].items():
     assert config['tool'] in known_tools[platform], f'{config[\"tool\"]} not valid for {platform}. Valid: {known_tools[platform]}'
     for alt in config['alternatives']:
         assert alt in known_tools[platform], f'alternative {alt} not valid for {platform}'
 
 print('All platform tools are valid')
 " 2>/dev/null; then
-    pass "All configured E2E tools are valid for their platforms"
+    pass "All configured verification tools are valid for their platforms"
   else
-    fail "Invalid E2E tool found for a platform"
+    fail "Invalid verification tool found for a platform"
   fi
 
   # Test: config with no platforms is valid (api-only project)
@@ -1415,14 +1428,18 @@ print('All platform tools are valid')
   "profile": { "default": "adaptive" },
   "review": {
     "layers": ["cleanup", "peer-review", "cross-model", "e2e"],
-    "tools": { "cleanup": "built-in", "peer-review": "built-in", "cross-model": null },
-    "e2e": {
-      "platforms": {
-        "api": { "tool": "built-in", "alternatives": [] }
-      }
-    },
+    "tools": { "cleanup": "built-in", "peer-review": "built-in", "cross-model": null, "e2e": "built-in" },
     "alternatives": {},
     "profiles": {}
+  },
+  "verification": {
+    "platforms": {
+      "api": { "tool": "built-in", "alternatives": [] }
+    },
+    "profiles": {
+      "full": { "run": "all-platforms" }, "standard": { "run": "primary-only" },
+      "light": { "run": "built-in-only" }, "draft": { "run": "none" }
+    }
   },
   "source": { "type": "user-input", "paths": [], "user_notes": null, "resolved_at": "2026-04-04T00:00:00Z" },
   "scope_rule": "one-feature-per-session",
@@ -1434,9 +1451,9 @@ JSON
   if python3 -c "
 import json
 c = json.load(open('$schema_dir/api-only-config.json'))
-assert len(c['review']['e2e']['platforms']) == 1
-assert 'api' in c['review']['e2e']['platforms']
-assert c['review']['e2e']['platforms']['api']['tool'] == 'built-in'
+assert len(c['verification']['platforms']) == 1
+assert 'api' in c['verification']['platforms']
+assert c['verification']['platforms']['api']['tool'] == 'built-in'
 print('API-only config valid')
 " 2>/dev/null; then
     pass "API-only project config (single platform) validates correctly"
@@ -1452,22 +1469,26 @@ print('API-only config valid')
   "profile": { "default": "adaptive" },
   "review": {
     "layers": ["cleanup", "peer-review", "cross-model", "e2e"],
-    "tools": { "cleanup": "built-in", "peer-review": "built-in", "cross-model": null },
-    "e2e": {
-      "platforms": {
-        "web": { "tool": "playwright", "alternatives": ["built-in"] },
-        "ios": { "tool": "mobile-mcp", "alternatives": ["built-in"] },
-        "android": { "tool": "mobile-mcp", "alternatives": ["built-in"] },
-        "electron": { "tool": "electron-playwright-mcp", "alternatives": ["built-in"] },
-        "tauri": { "tool": "tauri-plugin-mcp", "alternatives": ["built-in"] },
-        "flutter-desktop": { "tool": "patrol", "alternatives": ["built-in"] },
-        "audio-plugin": { "tool": "pluginval", "alternatives": ["built-in"] },
-        "api": { "tool": "built-in", "alternatives": [] },
-        "cli": { "tool": "built-in", "alternatives": [] }
-      }
-    },
+    "tools": { "cleanup": "built-in", "peer-review": "built-in", "cross-model": null, "e2e": "built-in" },
     "alternatives": {},
     "profiles": {}
+  },
+  "verification": {
+    "platforms": {
+      "web": { "tool": "playwright", "alternatives": ["built-in"] },
+      "ios": { "tool": "mobile-mcp", "alternatives": ["built-in"] },
+      "android": { "tool": "mobile-mcp", "alternatives": ["built-in"] },
+      "electron": { "tool": "electron-playwright-mcp", "alternatives": ["built-in"] },
+      "tauri": { "tool": "tauri-plugin-mcp", "alternatives": ["built-in"] },
+      "flutter-desktop": { "tool": "patrol", "alternatives": ["built-in"] },
+      "audio-plugin": { "tool": "pluginval", "alternatives": ["built-in"] },
+      "api": { "tool": "built-in", "alternatives": [] },
+      "cli": { "tool": "built-in", "alternatives": [] }
+    },
+    "profiles": {
+      "full": { "run": "all-platforms" }, "standard": { "run": "primary-only" },
+      "light": { "run": "built-in-only" }, "draft": { "run": "none" }
+    }
   },
   "source": { "type": "user-input", "paths": [], "user_notes": null, "resolved_at": "2026-04-04T00:00:00Z" },
   "scope_rule": "one-feature-per-session",
@@ -1479,8 +1500,8 @@ JSON
   if python3 -c "
 import json
 c = json.load(open('$schema_dir/multi-platform-config.json'))
-assert len(c['review']['e2e']['platforms']) == 9, f'expected 9 platforms, got {len(c[\"review\"][\"e2e\"][\"platforms\"])}'
-print(f'Multi-platform config valid: {len(c[\"review\"][\"e2e\"][\"platforms\"])} platforms')
+assert len(c['verification']['platforms']) == 9, f'expected 9 platforms, got {len(c[\"verification\"][\"platforms\"])}'
+print(f'Multi-platform config valid: {len(c[\"verification\"][\"platforms\"])} platforms')
 " 2>/dev/null; then
     pass "Multi-platform config (all 9 platforms) validates correctly"
   else
@@ -1686,15 +1707,23 @@ I want to re-initialize flywheel for this project. The project now has web, iOS,
 
 Use built-in defaults for planning, multi-agent, cleanup, peer-review, and cross-model.
 
-For E2E: detect the platforms from the project files. For each detected platform, use built-in E2E tools. The config should use the new platform-aware E2E format:
+For platform verification: detect the platforms from the project files. For each detected platform, use built-in verification tools. The config should use the v1.9.0 verification format (top-level, separate from review):
 
 ```json
-"e2e": {
+"verification": {
   "platforms": {
     "<platform>": { "tool": "built-in", "alternatives": [...] }
+  },
+  "profiles": {
+    "full": { "run": "all-platforms" },
+    "standard": { "run": "primary-only" },
+    "light": { "run": "built-in-only" },
+    "draft": { "run": "none" }
   }
 }
 ```
+
+Also ensure review.tools.e2e is set to "built-in" for code review E2E (separate from platform verification).
 
 Save to .flywheel/flywheel-config.json (overwrite existing). Keep the existing feature-checklist.json. Commit the updated config.
 PROMPT
@@ -1705,17 +1734,21 @@ PROMPT
 
   log "Checking platform-aware E2E config..."
 
-  # Helper: extract E2E platforms dict from config (accepts both canonical and legacy locations)
+  # Helper: extract verification platforms dict from config (accepts both canonical and legacy locations)
   local e2e_extract_helper='
 def get_e2e_platforms(path):
     import json
     c = json.load(open(path))
+    # v1.9.0 canonical: verification.platforms (top-level)
+    verification = c.get("verification", {})
+    if isinstance(verification, dict) and "platforms" in verification:
+        return verification["platforms"]
+    # v1.8.0 legacy: review.e2e.platforms
     review = c.get("review", {})
-    # Canonical: review.e2e.platforms
     e2e = review.get("e2e", {})
     if isinstance(e2e, dict) and "platforms" in e2e:
         return e2e["platforms"]
-    # Legacy fallback: review.tools.e2e.platforms
+    # v1.7.0 legacy: review.tools.e2e.platforms
     e2e = review.get("tools", {}).get("e2e", {})
     if isinstance(e2e, dict) and "platforms" in e2e:
         return e2e["platforms"]
@@ -1727,7 +1760,7 @@ def get_e2e_platforms(path):
   if python3 -c "
 ${e2e_extract_helper}
 platforms = get_e2e_platforms('${config_path}')
-assert platforms is not None, 'Platform-aware E2E not found in review.e2e or review.tools.e2e'
+assert platforms is not None, 'Platform-aware verification not found in verification.platforms, review.e2e, or review.tools.e2e'
 assert isinstance(platforms, dict), f'platforms must be dict, got {type(platforms)}'
 assert len(platforms) >= 1, 'at least one platform expected'
 for p, cfg in platforms.items():
@@ -1938,5 +1971,9 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
+
+# Tee all output to a log file so progress is observable from any terminal:
+#   tail -f /tmp/flywheel-test-latest.log
+exec > >(tee "$LOG_FILE") 2>&1
 
 main

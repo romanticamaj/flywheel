@@ -757,7 +757,7 @@ Each feature entry follows this schema:
 }
 ```
 
-Valid `status` values: `pending`, `in-progress`, `completed`, `blocked`, `split`.
+Valid `status` values: `pending`, `in-progress`, `implemented`, `needs-fix`, `verified`, `blocked`, `split`.
 
 ### `.flywheel/init.sh` and `.flywheel/init.ps1`
 
@@ -768,7 +768,7 @@ Auto-detect the project type and generate both scripts. See Section 4 for the de
 Create as an empty file. The Coding Agent appends one JSON object per session:
 
 ```json
-{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","status":"completed","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
+{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","status":"implemented","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
 ```
 
 Log rotation: keep the last 50 entries in the active file. When exceeding 50, archive older entries to `.flywheel/claude-progress-archive.jsonl`.

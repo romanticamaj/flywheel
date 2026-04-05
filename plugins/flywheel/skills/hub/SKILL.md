@@ -93,7 +93,7 @@ Path: `.flywheel/flywheel-config.json`
       "cleanup": ["superpowers:/simplify"],
       "peer-review": ["gstack:/review", "superpowers:peer-reviewer"],
       "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
-      "e2e": ["gstack:/qa", "playwright"]
+      "e2e": ["gstack:/qa"]
     },
     "profiles": {
       "full":     { "cleanup": true,  "peer-review": "full",    "cross-model": true,  "e2e": true  },

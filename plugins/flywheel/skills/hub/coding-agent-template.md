@@ -67,7 +67,7 @@ If `.flywheel/claude-progress.jsonl` is missing or corrupt, treat this as the fi
 Read `.flywheel/feature-checklist.json` and select the next feature to implement:
 
 1. Parse the checklist.
-2. Skip any item with status `blocked`.
+2. Skip any item with status `blocked`, `split`, `implemented`, or `verified`.
 3. **First**, check for features with status `needs-fix` — these are user-verified issues that take priority over new work. Pick the highest priority `needs-fix` item.
 4. If no `needs-fix` items, pick the highest priority `pending` item (lowest `priority` number).
 5. Read the feature's `title`, `description`, and `acceptance_criteria` — these define the scope for this session.
@@ -624,7 +624,7 @@ pending → in-progress → implemented → verified ✅
                           needs-fix → (next relay fixes) → implemented → verified ✅
 ```
 
-Valid statuses: `pending`, `in-progress`, `implemented`, `needs-fix`, `verified`, `blocked`
+Valid statuses: `pending`, `in-progress`, `implemented`, `needs-fix`, `verified`, `blocked`, `split`
 
 - `pending` — not started
 - `in-progress` — being worked on in current session
@@ -632,6 +632,7 @@ Valid statuses: `pending`, `in-progress`, `implemented`, `needs-fix`, `verified`
 - `needs-fix` — user found issues, fix sub-features created
 - `verified` — user confirmed it works
 - `blocked` — cannot proceed, needs human intervention
+- `split` — decomposed into sub-features (has `split_into` array)
 
 ---
 

@@ -8,7 +8,7 @@ You are starting a Coding Agent session. Follow the 10-step loop below **to comp
 
 > **Context budget rule:** If you sense context is running low (large diffs, many tool calls, complex native code), simplify remaining steps rather than abandoning them. A terse flow summary is better than no flow summary.
 
-**REQUIRED:** Read the `flywheel:hub` skill first for overview, then read the `coding-agent-template.md` file in the hub skill directory for detailed sub-step instructions (8a–8f, 9a–9e, 10a–10d).
+**REQUIRED:** Read the `flywheel:hub` skill first for overview, then read the `coding-agent-template.md` file in the hub skill directory for detailed sub-step instructions (8a–8f, 9a–9d, 10a–10f).
 
 ---
 
@@ -47,7 +47,7 @@ You MUST execute every step below and output its checkpoint marker. Do not skip 
 - **Checkpoint:** `✅ Step 7/10: Implementation complete`
 
 ### Step 8/10 — Review
-- Run review layers per active profile (see coding-agent-template.md Steps 8a–8e for details).
+- Run review layers per active profile (see coding-agent-template.md Steps 8a–8f for details).
 - Layers: cleanup → peer-review → cross-model → e2e (code review).
 - Each layer: attempt configured tool first → log error if fail → ask user before fallback.
 - **Checkpoint:** `✅ Step 8/10: Review complete — {layers run summary}`

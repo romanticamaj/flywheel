@@ -62,14 +62,16 @@ What you lose by skipping:
 
 ## E2E Verification — Platform-Aware
 
-Layer 4 is **platform-aware**. Different project types need different E2E strategies. The platform(s) are detected during `flywheel:init` and stored in `flywheel-config.json` under `review.e2e`.
+Layer 4 (review E2E) answers "does the change break anything?" using the project's test suite and smoke tests. **Platform-specific acceptance verification** (e.g., "does the feature work on iOS simulator?") is handled separately in Step 9 of the coding agent template, using `verification.platforms` in `flywheel-config.json`.
 
-### E2E Execution Flow
+### E2E Execution Flow (Review Layer)
 
-1. Read `review.e2e.platforms` from `.flywheel/flywheel-config.json`
-2. For each configured platform, run its selected tool
-3. Always run the built-in fallback (test suite + health check) regardless of platform tools
-4. Aggregate results — any critical failure from any platform blocks merge
+1. Run the project's test suite (unit + integration tests)
+2. Run built-in smoke test (health check, build verification)
+3. If platform-specific E2E tools are configured in `review.tools.e2e`, run those too
+4. Aggregate results — any critical failure blocks merge
+
+> **Note:** For platform acceptance verification (simulator testing, browser flow testing), see `verification.platforms` in the config and Step 9 of `coding-agent-template.md`.
 
 ### Platform Tool Matrix
 
