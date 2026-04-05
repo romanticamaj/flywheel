@@ -176,18 +176,44 @@ cleanup() {
 
 # ── Invoke Claude Code ──
 
+# Default timeout per test (seconds). Override with FLYWHEEL_TEST_TIMEOUT env var.
+DEFAULT_TEST_TIMEOUT="${FLYWHEEL_TEST_TIMEOUT:-180}"
+
+# Heartbeat: print elapsed time every N seconds while Claude is running.
+# Runs as a background process; killed when Claude finishes.
+_heartbeat() {
+  local name="$1"
+  local pid="$2"
+  local interval=15
+  local elapsed=0
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+    local mins=$((elapsed / 60))
+    local secs=$((elapsed % 60))
+    # Show heartbeat + last line of stderr for activity signal
+    local activity=""
+    if [[ -f "$RESULTS_DIR/${name}.stderr" ]]; then
+      activity=$(tail -1 "$RESULTS_DIR/${name}.stderr" 2>/dev/null | head -c 80)
+    fi
+    if [[ -n "$activity" ]]; then
+      echo -e "${YELLOW}  ⏳ ${name}: ${mins}m ${secs}s — ${activity}${NC}" >&2
+    else
+      echo -e "${YELLOW}  ⏳ ${name}: ${mins}m ${secs}s elapsed...${NC}" >&2
+    fi
+  done
+}
+
 invoke_claude() {
   local test_name="$1"
   local prompt="$2"
+  local timeout="${3:-$DEFAULT_TEST_TIMEOUT}"
   local output_file="$RESULTS_DIR/${test_name}.txt"
   local json_file="$RESULTS_DIR/${test_name}.json"
 
-  log "Invoking Claude Code for test: $test_name" >&2
+  log "Invoking Claude Code for test: $test_name (timeout: ${timeout}s)" >&2
 
-  # Run Claude Code in print mode with flywheel plugin
-  # --dangerously-skip-permissions to avoid interactive prompts in CI
-  # --plugin-dir to load the flywheel skill
-  # --output-format json to get structured output
+  # Run Claude Code in background so we can monitor + timeout
   set +e
   claude -p "$prompt" \
     --plugin-dir "$FLYWHEEL_DIR" \
@@ -197,13 +223,46 @@ invoke_claude() {
     --model sonnet \
     --max-budget-usd 1.00 \
     2>"$RESULTS_DIR/${test_name}.stderr" \
-    > "$json_file"
-  local exit_code=$?
+    > "$json_file" &
+  local claude_pid=$!
+
+  # Start heartbeat in background
+  _heartbeat "$test_name" "$claude_pid" &
+  local heartbeat_pid=$!
+
+  # Wait for Claude to finish or timeout
+  local elapsed=0
+  local exit_code=0
+  while kill -0 "$claude_pid" 2>/dev/null; do
+    if [[ $elapsed -ge $timeout ]]; then
+      warn "TIMEOUT: $test_name exceeded ${timeout}s — killing Claude process" >&2
+      kill "$claude_pid" 2>/dev/null
+      wait "$claude_pid" 2>/dev/null || true
+      exit_code=124  # standard timeout exit code
+      break
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  # If Claude finished normally, collect its exit code
+  if [[ $exit_code -ne 124 ]]; then
+    wait "$claude_pid" 2>/dev/null
+    exit_code=$?
+  fi
+
+  # Stop heartbeat
+  kill "$heartbeat_pid" 2>/dev/null
+  wait "$heartbeat_pid" 2>/dev/null || true
   set -e
 
-  if [[ $exit_code -ne 0 ]]; then
+  if [[ $exit_code -eq 124 ]]; then
+    fail "Test $test_name TIMED OUT after ${timeout}s" >&2
+    echo -e "${YELLOW}  Last stderr output:${NC}" >&2
+    tail -5 "$RESULTS_DIR/${test_name}.stderr" 2>/dev/null >&2 || true
+  elif [[ $exit_code -ne 0 ]]; then
     warn "Claude exited with code $exit_code for test: $test_name" >&2
-    cat "$RESULTS_DIR/${test_name}.stderr" 2>/dev/null >&2 || true
+    tail -5 "$RESULTS_DIR/${test_name}.stderr" 2>/dev/null >&2 || true
   fi
 
   # Extract text result from JSON output
@@ -384,7 +443,7 @@ PROMPT
 )
 
   local output_file
-  output_file=$(invoke_claude "relay" "$prompt")
+  output_file=$(invoke_claude "relay" "$prompt" 300)
 
   log "Checking coding agent results..."
 
@@ -504,7 +563,7 @@ PROMPT
 )
 
   local output_file
-  output_file=$(invoke_claude "relay_continuity" "$prompt")
+  output_file=$(invoke_claude "relay_continuity" "$prompt" 300)
 
   log "Checking session continuity..."
 
