@@ -30,7 +30,7 @@ See `initializer-template.md` for the full Initializer protocol — runtime dete
 
 ### Phase 2: Coding Agent (run N times)
 
-Each session follows a 10-step loop: validate config, read handoff log, read checklist, bootstrap, smoke test, plan the implementation, implement one feature, review + verify, commit + handoff, user verification checkpoint.
+Each session follows a 10-step loop: validate config, read handoff log, read checklist, bootstrap, smoke test, plan the implementation, implement one feature, review (code review layers), verify (platform verification), commit + handoff + flow summary + user verification checkpoint.
 
 See `coding-agent-template.md` for the full Coding Agent protocol — step-by-step instructions, error handling table, exit rule, and scope rule.
 
@@ -102,6 +102,18 @@ Path: `.flywheel/flywheel-config.json`
       "draft":    { "cleanup": false, "peer-review": false,     "cross-model": false, "e2e": false }
     }
   },
+  "verification": {
+    "platforms": {
+      "web": { "tool": "playwright", "alternatives": ["gstack:/qa", "built-in"] },
+      "ios": { "tool": "built-in", "alternatives": ["mobile-mcp", "ios-simulator-mcp", "maestro"] }
+    },
+    "profiles": {
+      "full":     { "run": "all-platforms" },
+      "standard": { "run": "primary-only" },
+      "light":    { "run": "built-in-only" },
+      "draft":    { "run": "none" }
+    }
+  },
   "source": {
     "type": "file",
     "paths": ["SPEC.md"],
@@ -129,6 +141,10 @@ Path: `.flywheel/flywheel-config.json`
 | `review.tools` | object | Per-layer tool choice; `null` means layer is skipped |
 | `review.alternatives` | object | Per-layer list of known tools for future upgrades |
 | `review.profiles` | object | Per-profile layer config: `true`/`false`/`"full"`/`"top5"`/`"verdict"` |
+| `verification.platforms` | object | Map of platform → `{ tool, alternatives }`. Separate from review E2E. |
+| `verification.platforms.<platform>.tool` | string | Selected verification tool for this platform |
+| `verification.platforms.<platform>.alternatives` | string[] | Fallback tools for this platform |
+| `verification.profiles` | object | Per-profile verification dispatch: `"all-platforms"`, `"primary-only"`, `"built-in-only"`, `"none"` |
 | `source.type` | string | How the checklist was sourced: `"file"`, `"user-input"`, `"codebase"`, or `"mixed"` |
 | `source.paths` | string[] | Spec files used as input |
 | `source.user_notes` | string\|null | Extra context from user conversation |

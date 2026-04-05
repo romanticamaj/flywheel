@@ -12,7 +12,7 @@ A 4-layer review pipeline where each layer catches what the previous one misses.
 ## When to Use
 
 - After implementing a feature, before merging
-- As the review step in the flywheel Coding Agent loop (step 7 of 8: Implement → Review → Commit)
+- As the review step in the flywheel Coding Agent loop (Step 8 of 10: Implement → Review → Verify → Commit)
 - Any time code changes need quality verification
 
 ## When NOT to Use

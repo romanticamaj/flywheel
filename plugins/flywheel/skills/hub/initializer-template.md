@@ -554,24 +554,32 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
     "tools": {
       "cleanup": "built-in",
       "peer-review": "built-in",
-      "cross-model": null
-    },
-    "e2e": {
-      "platforms": {
-        "web": { "tool": "playwright", "alternatives": ["gstack:/qa", "built-in"] },
-        "ios": { "tool": "mobile-mcp", "alternatives": ["ios-simulator-mcp", "maestro", "built-in"] }
-      }
+      "cross-model": null,
+      "e2e": "built-in"
     },
     "alternatives": {
       "cleanup": ["superpowers:/simplify"],
       "peer-review": ["gstack:/review", "superpowers:peer-reviewer"],
-      "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"]
+      "cross-model": ["codex:review", "gstack:/codex", "gemini-cli"],
+      "e2e": ["gstack:/qa"]
     },
     "profiles": {
       "full":     { "cleanup": true,  "peer-review": "full",    "cross-model": true,  "e2e": true  },
       "standard": { "cleanup": false, "peer-review": "top5",    "cross-model": false, "e2e": true  },
       "light":    { "cleanup": false, "peer-review": "verdict", "cross-model": false, "e2e": false },
       "draft":    { "cleanup": false, "peer-review": false,     "cross-model": false, "e2e": false }
+    }
+  },
+  "verification": {
+    "platforms": {
+      "web": { "tool": "playwright", "alternatives": ["gstack:/qa", "built-in"] },
+      "ios": { "tool": "mobile-mcp", "alternatives": ["ios-simulator-mcp", "maestro", "built-in"] }
+    },
+    "profiles": {
+      "full":     { "run": "all-platforms" },
+      "standard": { "run": "primary-only" },
+      "light":    { "run": "built-in-only" },
+      "draft":    { "run": "none" }
     }
   },
   "source": {
@@ -598,13 +606,13 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
 | `profile.adaptive_rules` | object | Maps feature priority ranges to profiles |
 | `profile.bump_rules` | object | Conditions that override the adaptive selection |
 | `review.layers` | string[] | Fixed: `["cleanup", "peer-review", "cross-model", "e2e"]` |
-| `review.tools` | object | Per-layer tool choice (cleanup, peer-review, cross-model); `null` means layer is skipped |
-| `review.e2e` | object | Platform-aware E2E configuration (see below) |
-| `review.e2e.platforms` | object | Map of platform → `{ tool, alternatives }`. Valid platforms: `web`, `ios`, `android`, `electron`, `tauri`, `flutter-desktop`, `audio-plugin`, `api`, `cli` |
-| `review.e2e.platforms.<platform>.tool` | string | Selected E2E tool for this platform, or `"built-in"` |
-| `review.e2e.platforms.<platform>.alternatives` | string[] | Other known tools for this platform |
-| `review.alternatives` | object | Per-layer list of known tools (cleanup, peer-review, cross-model) |
+| `review.tools` | object | Per-layer tool choice (cleanup, peer-review, cross-model, e2e); `null` means layer is skipped |
+| `review.alternatives` | object | Per-layer list of known tools |
 | `review.profiles` | object | Per-profile layer config: `true`/`false`/`"full"`/`"top5"`/`"verdict"` |
+| `verification.platforms` | object | Map of platform → `{ tool, alternatives }`. Separate from review E2E — this is acceptance testing on target platforms. Valid platforms: `web`, `ios`, `android`, `electron`, `tauri`, `flutter-desktop`, `audio-plugin`, `api`, `cli` |
+| `verification.platforms.<platform>.tool` | string | Selected verification tool for this platform, or `"built-in"` |
+| `verification.platforms.<platform>.alternatives` | string[] | Fallback tools for this platform |
+| `verification.profiles` | object | Per-profile verification dispatch: `"all-platforms"`, `"primary-only"`, `"built-in-only"`, `"none"` |
 | `scope_rule` | string | `"one-feature-per-session"` |
 | `exit_rule` | string | `"merge-ready"` |
 | `branch_naming` | string | Template with `{id}` and `{slug}` placeholders |
@@ -677,9 +685,52 @@ Valid `type` values: `"file"`, `"user-input"`, `"codebase"`, `"mixed"`.
 
 `paths` lists which files were used. `user_notes` captures any extra context the user provided on top of the detected sources. Both can be empty arrays/null.
 
+#### Context-Friendly Feature Sizing
+
+**Before finalizing the checklist**, review each feature for context-friendliness. A feature that exhausts context mid-session will never reach the flow summary — the #1 failure mode in flywheel.
+
+**Size heuristics — flag features that are likely too large:**
+
+| Signal | Risk Level | Action |
+|--------|-----------|--------|
+| Requires native code patches (Swift, Kotlin, C++) | High | Split: native patch + JS integration + verification |
+| Touches >5 files across >3 directories | Medium | Consider splitting by layer (backend, frontend, config) |
+| Has >5 acceptance criteria | Medium | Each criterion could be its own feature |
+| Involves simulator/device testing + code changes | High | Split: implementation + platform verification |
+| Requires multiple fix-and-retry cycles (e.g., patch format, build errors) | High | Split into smaller, independently testable pieces |
+| Description includes "and" joining two distinct concerns | Medium | Split on the "and" |
+
+**Present sizing review to user:**
+
+```
+FEATURE SIZING REVIEW
+┌───────────┬─────────────────────────────────┬──────────┬──────────────────────────────┐
+│ ID        │ Title                           │ Size     │ Recommendation               │
+├───────────┼─────────────────────────────────┼──────────┼──────────────────────────────┤
+│ feat-001  │ User authentication             │ ✅ OK    │                              │
+│ feat-002  │ Lock screen controls + seek fix │ ⚠️ Large │ Split: native patch, JS glue,│
+│           │                                 │          │ lock screen commands          │
+│ feat-003  │ API rate limiting               │ ✅ OK    │                              │
+└───────────┴─────────────────────────────────┴──────────┴──────────────────────────────┘
+
+feat-002 looks large — it involves native Swift patches + JS integration + simulator testing.
+Split into sub-features? (y/n)
+```
+
+**If user agrees to split:**
+- Create sub-features with IDs like `feat-002a`, `feat-002b`, `feat-002c`
+- Set the parent feature status to `split` with `"split_into": ["feat-002a", "feat-002b", "feat-002c"]`
+- Each sub-feature inherits the parent's priority
+- Each sub-feature should be completable in a single session with context to spare
+
+**Sizing guidelines for the agent:**
+- A well-sized feature should use <60% of available context for implementation, leaving room for review, verification, and flow summary
+- Features involving native code (iOS/Android patches, C++ bindings) should be split from their JS/TS integration layer
+- "Patch + test on device" is always two features, not one
+
 #### Generating the checklist
 
-After source resolution, create the version-1 wrapper and populate features:
+After source resolution and sizing review, create the version-1 wrapper and populate features:
 
 ```json
 {

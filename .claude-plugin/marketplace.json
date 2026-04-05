@@ -9,7 +9,7 @@
     {
       "name": "flywheel",
       "description": "Zero-cost session handoffs for long-running agent work. Initializer + Coding Agent relay protocol with pluggable planning, multi-agent, and review spokes.",
-      "version": "1.8.0",
+      "version": "1.9.0",
       "source": "./plugins/flywheel",
       "category": "productivity",
       "homepage": "https://github.com/romanticamaj/flywheel",
