@@ -351,13 +351,14 @@ Use the feature ID and title from the checklist. Only add files that were change
 Append a single JSONL entry to `.flywheel/claude-progress.jsonl`:
 
 ```json
-{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","status":"verified","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"review":{"cleanup":"superpowers:/simplify","peer-review":"gstack:/review","cross-model":"skipped (disabled)","e2e":"built-in smoke test"},"verification":{"status":"user-verified","verified_at":"2026-03-23T14:35:00Z","fix_items":[]},"planning":{"tool":"planning-with-files","output":"task_plan.md with 5 steps"},"multi_agent":{"tool":"not used","reason":"single-threaded implementation"},"compliance":{"total":16,"ok":15,"fallback":0,"skipped":1,"violations":0},"flow_summary":"Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: cleanup OK, peer-review OK, cross-model skipped (user-approved), e2e OK. 6/6 acceptance criteria met. Verification: user-verified.","next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
+{"timestamp":"2026-03-23T14:30:00Z","feature_id":"feat-001","feature_title":"User authentication","feature_description":"Add sign-up, login, and JWT-based session management","status":"verified","changes":["Added auth module (src/auth/)","Login/signup endpoints","JWT middleware"],"tests":{"unit":12,"e2e":1,"all_passing":true},"review":{"cleanup":"superpowers:/simplify","peer-review":"gstack:/review","cross-model":"skipped (disabled)","e2e":"built-in smoke test"},"verification":{"status":"user-verified","verified_at":"2026-03-23T14:35:00Z","fix_items":[]},"planning":{"tool":"planning-with-files","output":"task_plan.md with 5 steps"},"multi_agent":{"tool":"not used","reason":"single-threaded implementation"},"compliance":{"total":16,"ok":15,"fallback":0,"skipped":1,"violations":0},"flow_summary":"Planning: planning-with-files (task_plan.md). Multi-agent: not used. Review: cleanup OK, peer-review OK, cross-model skipped (user-approved), e2e OK. 6/6 acceptance criteria met. Verification: user-verified.","next_priority":"feat-002","notes":"Used bcrypt for password hashing, tokens expire in 24h"}
 ```
 
 Fields:
 - `timestamp` — ISO 8601 UTC timestamp of commit
 - `feature_id` — the feature ID from the checklist (e.g., `feat-001`)
 - `feature_title` — human-readable title
+- `feature_description` — one-line summary of what was implemented (from checklist description or auto-generated)
 - `status` — `verified`, `implemented`, `needs-fix`, `blocked`, or `aborted`
 - `changes` — array of short descriptions of what changed
 - `tests` — object with `unit` count, `e2e` count, and `all_passing` boolean
@@ -394,6 +395,15 @@ Format:
 ```
 SESSION FLOW SUMMARY — feat-XXX: <feature title>
 Branch: <branch name> | Commits: <commit hashes> | Profile: <active profile>
+
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ FEATURE                                                                         │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ Title:       User authentication                                                │
+│ Description: Add sign-up, login, and JWT-based session management               │
+│ Priority:    1 (high)                                                           │
+│ Status:      implemented → awaiting verification                                │
+└─────────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ STAGE COMPLIANCE                                                                │
@@ -446,11 +456,12 @@ NEXT UP: feat-002 — User profile settings
 ```
 
 **Rules:**
-1. **Every section must be filled in.** If a spoke was not used, show it in the table with a reason (e.g., "not used — no parallelizable subtasks").
-2. **Spoke Usage table must show all 4 review layers** (Cleanup, Peer review, Cross-model, E2E), even if some were skipped or disabled by the profile.
-3. **Acceptance Criteria must list ALL criteria** from the checklist with pass/fail status.
-4. **Key Decisions** — list any notable technical decisions, trade-offs, or surprises. If none, write "None — straightforward implementation."
-5. A **violation** is when a stage was skipped or substituted WITHOUT attempting the configured tool and WITHOUT user approval. Violations should be zero. If non-zero, explain in Key Decisions.
+1. **Feature section is mandatory.** Show the title, description (from checklist or one-line summary), priority, and current status. This gives the user immediate context for what to verify.
+2. **Every section must be filled in.** If a spoke was not used, show it in the table with a reason (e.g., "not used — no parallelizable subtasks").
+3. **Spoke Usage table must show all 4 review layers** (Cleanup, Peer review, Cross-model, E2E), even if some were skipped or disabled by the profile.
+4. **Acceptance Criteria must list ALL criteria** from the checklist with pass/fail status.
+5. **Key Decisions** — list any notable technical decisions, trade-offs, or surprises. If none, write "None — straightforward implementation."
+6. A **violation** is when a stage was skipped or substituted WITHOUT attempting the configured tool and WITHOUT user approval. Violations should be zero. If non-zero, explain in Key Decisions.
 
 Also include in the handoff JSONL entry:
 
