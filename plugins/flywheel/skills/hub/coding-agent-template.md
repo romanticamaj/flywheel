@@ -4,6 +4,8 @@ This template defines the loop that every Coding Agent session follows in the fl
 
 > **Context budget rule:** If context is running low (large diffs, many tool calls, complex native code), compress remaining output but still complete every step. A terse flow summary is better than no flow summary. Never abandon the session before Step 10.
 
+> **Step breadcrumb:** At the start of each step, write a progress marker: `echo "Step N/10: Name" > .flywheel/.relay-step`. This lets external monitors (CI, test harness, human watchers) see which step you're on. Clear the file (`rm -f .flywheel/.relay-step`) at session end.
+
 ---
 
 ## Stage Tracker

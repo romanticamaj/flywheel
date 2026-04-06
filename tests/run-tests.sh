@@ -38,7 +38,7 @@ set -euo pipefail
 # Other:
 #   --cleanup               Remove the test workspace
 #
-# Test inventory (15 tests, ~45 assertions):
+# Test inventory (15 tests, ~57 assertions):
 #   TEST 1:  Initializer (/init)           — .flywheel/ dir, config schema, checklist schema, init scripts, git commit
 #   TEST 2:  Coding Agent (/relay)         — handoff log, JSONL schema, checklist update, feature commit, compliance output
 #   TEST 3:  Session Continuity            — handoff log growth, different feature picked, no duplicate work
@@ -59,7 +59,8 @@ set -euo pipefail
 #   - `claude` CLI installed and authenticated
 #   - `python3` available (for JSON validation)
 #   - `git` available
-#   - Each test invocation costs ~$0.30-$1.00 (Sonnet, $1.00 budget cap per call)
+#   - Each test invocation costs ~$0.30-$2.00 (Sonnet; relay/continuity use $2.00 cap, others $1.00)
+#   - Override budget with FLYWHEEL_TEST_BUDGET env var (default: $1.00 for non-relay tests)
 #   - Per-stage timing is logged after each test; a timing summary table is shown at the end
 
 FLYWHEEL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -191,27 +192,42 @@ _heartbeat() {
     elapsed=$((elapsed + interval))
     local mins=$((elapsed / 60))
     local secs=$((elapsed % 60))
-    # Show heartbeat + last line of stderr for activity signal
+    # Show heartbeat with step breadcrumb + last line of stderr
+    local step=""
+    if [[ -f "$TEST_WORKSPACE/.flywheel/.relay-step" ]]; then
+      step=$(cat "$TEST_WORKSPACE/.flywheel/.relay-step" 2>/dev/null | head -c 60)
+    fi
     local activity=""
     if [[ -f "$RESULTS_DIR/${name}.stderr" ]]; then
       activity=$(tail -1 "$RESULTS_DIR/${name}.stderr" 2>/dev/null | head -c 80)
     fi
-    if [[ -n "$activity" ]]; then
-      echo -e "${YELLOW}  ⏳ ${name}: ${mins}m ${secs}s — ${activity}${NC}" >&2
+    local detail=""
+    if [[ -n "$step" && -n "$activity" ]]; then
+      detail="[${step}] ${activity}"
+    elif [[ -n "$step" ]]; then
+      detail="[${step}]"
+    elif [[ -n "$activity" ]]; then
+      detail="${activity}"
+    fi
+    if [[ -n "$detail" ]]; then
+      echo -e "${YELLOW}  ⏳ ${name}: ${mins}m ${secs}s — ${detail}${NC}" >&2
     else
       echo -e "${YELLOW}  ⏳ ${name}: ${mins}m ${secs}s elapsed...${NC}" >&2
     fi
   done
 }
 
+DEFAULT_BUDGET="${FLYWHEEL_TEST_BUDGET:-1.00}"
+
 invoke_claude() {
   local test_name="$1"
   local prompt="$2"
   local timeout="${3:-$DEFAULT_TEST_TIMEOUT}"
+  local budget="${4:-$DEFAULT_BUDGET}"
   local output_file="$RESULTS_DIR/${test_name}.txt"
   local json_file="$RESULTS_DIR/${test_name}.json"
 
-  log "Invoking Claude Code for test: $test_name (timeout: ${timeout}s)" >&2
+  log "Invoking Claude Code for test: $test_name (timeout: ${timeout}s, budget: \$${budget})" >&2
 
   # Run Claude Code in background so we can monitor + timeout
   set +e
@@ -221,7 +237,7 @@ invoke_claude() {
     --output-format json \
     --no-session-persistence \
     --model sonnet \
-    --max-budget-usd 1.00 \
+    --max-budget-usd "$budget" \
     2>"$RESULTS_DIR/${test_name}.stderr" \
     > "$json_file" &
   local claude_pid=$!
@@ -300,7 +316,7 @@ I want to initialize flywheel for this project. Use only built-in defaults for a
 
 After creating the flywheel artifacts, generate a feature checklist with these 3 features:
 
-1. "Health endpoint" (priority 1): Add a /health endpoint that returns {"status":"ok","uptime":<seconds>}. Acceptance criteria: GET /health returns 200 with JSON body containing status and uptime fields.
+1. "Add version constant" (priority 1): Add a VERSION constant set to "1.0.0" in src/index.js. Acceptance criteria: src/index.js exports a VERSION constant equal to "1.0.0".
 
 2. "User list endpoint" (priority 2): Add GET /users that returns a hardcoded list of users. Acceptance criteria: GET /users returns 200 with JSON array of user objects with id, name, email fields.
 
@@ -429,21 +445,31 @@ test_relay() {
 
   local prompt
   prompt=$(cat << 'PROMPT'
-Start a flywheel coding agent session. Follow the 10-step loop from the coding-agent-template.
+Run a flywheel relay session. This is a TEST — keep everything minimal.
 
-Important constraints for this test:
-- For ALL review layers, use built-in defaults (do not try to invoke gstack or superpowers — they are not installed).
-- Skip the cross-model review layer (it requires external tools).
-- For E2E, just run "npm test" and "npm run build" as the built-in smoke test.
-- Commit your changes when done.
-- Output the compliance table at the end.
+Steps (write breadcrumb at each: `echo "Step N/10: Name" > .flywheel/.relay-step`):
+1. Read .flywheel/flywheel-config.json
+2. Read .flywheel/claude-progress.jsonl and git log
+3. Read .flywheel/feature-checklist.json, pick highest-priority pending feature
+4. Skip bootstrap (no init.sh needed)
+5. Run "npm test" as smoke test
+6. Plan: the feature is trivial, just note what to change
+7. Implement the feature (KEEP IT SIMPLE — minimal code change, no refactoring)
+8. Review: run "npm test" and "npm run build"
+9. Verify: run "npm test"
+10. Commit + Handoff:
+    a. git add changed files and commit with message "feat(<feature-id>): <title>"
+    b. Append ONE JSON line to .flywheel/claude-progress.jsonl: {"feature_id":"<id>","status":"implemented","timestamp":"<ISO>","summary":"<one line>"}
+    c. Update the feature's status to "implemented" in .flywheel/feature-checklist.json (add "implemented_at" timestamp)
+    d. git add and commit the checklist/progress updates
+    e. Clean up: rm -f .flywheel/.relay-step
 
-Pick the highest-priority feature from the checklist and implement it.
+CRITICAL: You MUST reach step 10 and produce the handoff artifacts. Do not over-engineer. The feature should require only 1-2 lines of code change.
 PROMPT
 )
 
   local output_file
-  output_file=$(invoke_claude "relay" "$prompt" 300)
+  output_file=$(invoke_claude "relay" "$prompt" 300 2.00)
 
   log "Checking coding agent results..."
 
@@ -487,7 +513,7 @@ done = [f for f in c['features'] if f['status'] in ('completed', 'implemented', 
 if done:
     print(f'Done: {done[0][\"id\"]} — {done[0][\"title\"]} (status: {done[0][\"status\"]})')
 else:
-    raise AssertionError('No completed/implemented/verified features')
+    raise Exception('No completed/implemented/verified features')
 " 2>/dev/null; then
     pass "Feature checklist updated (at least one feature implemented)"
   else
@@ -496,7 +522,7 @@ else:
 
   # Check that code was actually implemented
   local new_commits
-  new_commits=$(cd "$TEST_WORKSPACE" && git log --oneline -5 | grep -i "feat\|health\|user\|log" | head -1)
+  new_commits=$(cd "$TEST_WORKSPACE" && git log --oneline -5 | grep -i "feat\|version\|health\|user\|log" | head -1)
   if [[ -n "$new_commits" ]]; then
     pass "Feature commit found: $new_commits"
   else
@@ -512,11 +538,11 @@ else:
 
   # Check the implemented feature works
   if [[ -f "$TEST_WORKSPACE/src/index.js" ]]; then
-    # Quick check: does the code reference /health with uptime?
-    if grep -q "uptime\|health" "$TEST_WORKSPACE/src/index.js" 2>/dev/null; then
-      pass "Implementation references health/uptime in source"
+    # Quick check: does the code have the VERSION constant?
+    if grep -q "VERSION\|version\|1\.0\.0" "$TEST_WORKSPACE/src/index.js" 2>/dev/null; then
+      pass "Implementation contains VERSION constant in source"
     else
-      warn "Could not verify health endpoint implementation in source"
+      warn "Could not verify VERSION constant in source"
     fi
   fi
 
@@ -549,21 +575,33 @@ print(len([f for f in c['features'] if f['status'] in ('completed', 'implemented
 
   local prompt
   prompt=$(cat << 'PROMPT'
-Start a flywheel coding agent session. Follow the 10-step loop.
+Run a flywheel relay session. This is a TEST — keep everything minimal.
 
-This is NOT the first session — read the handoff log and checklist first. Pick the next uncompleted feature.
+This is NOT the first session. Read the handoff log and checklist first. Pick the next pending feature (skip implemented ones).
 
-Important constraints:
-- Use built-in defaults for all review layers.
-- Skip cross-model review.
-- For E2E, run "npm test" and "npm run build".
-- Commit your changes and write the handoff entry.
-- Output the compliance table at the end.
+Steps (write breadcrumb at each: `echo "Step N/10: Name" > .flywheel/.relay-step`):
+1. Read .flywheel/flywheel-config.json
+2. Read .flywheel/claude-progress.jsonl and git log
+3. Read .flywheel/feature-checklist.json, pick next pending feature
+4. Skip bootstrap
+5. Run "npm test" as smoke test
+6. Plan: note what to change (keep it brief)
+7. Implement (minimal code change, no refactoring)
+8. Review: run "npm test" and "npm run build"
+9. Verify: run "npm test"
+10. Commit + Handoff:
+    a. git add changed files and commit with message "feat(<feature-id>): <title>"
+    b. Append ONE JSON line to .flywheel/claude-progress.jsonl: {"feature_id":"<id>","status":"implemented","timestamp":"<ISO>","summary":"<one line>"}
+    c. Update the feature's status to "implemented" in .flywheel/feature-checklist.json (add "implemented_at" timestamp)
+    d. git add and commit the checklist/progress updates
+    e. Clean up: rm -f .flywheel/.relay-step
+
+CRITICAL: You MUST reach step 10 and produce the handoff artifacts. Do not over-engineer.
 PROMPT
 )
 
   local output_file
-  output_file=$(invoke_claude "relay_continuity" "$prompt" 300)
+  output_file=$(invoke_claude "relay_continuity" "$prompt" 300 2.00)
 
   log "Checking session continuity..."
 
@@ -681,7 +719,7 @@ PROMPT
 
   # Check no files were modified (read-only) — exclude .test-results/ which is our own test harness artifact
   local git_status
-  git_status=$(cd "$TEST_WORKSPACE" && git status --porcelain 2>/dev/null | grep -v '\.test-results/' || echo "")
+  git_status=$(cd "$TEST_WORKSPACE" && git status --porcelain 2>/dev/null | grep -v '\.test-results/\|package-lock\.json\|\.relay-step' || echo "")
   if [[ -z "$git_status" ]]; then
     pass "No files modified (read-only verified)"
   else

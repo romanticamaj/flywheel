@@ -10,6 +10,8 @@ You are starting a Coding Agent session. Follow the 10-step loop below **to comp
 
 **REQUIRED:** Read the `flywheel:hub` skill first for overview, then read the `coding-agent-template.md` file in the hub skill directory for detailed sub-step instructions (8a–8f, 9a–9d, 10a–10f).
 
+> **Step breadcrumb:** At the start of each step, write a one-line marker to `.flywheel/.relay-step` so external monitors can track progress. Example: `echo "Step 6/10: Plan" > .flywheel/.relay-step`. Clear the file at session end.
+
 ---
 
 ## Execution Contract
@@ -17,42 +19,51 @@ You are starting a Coding Agent session. Follow the 10-step loop below **to comp
 You MUST execute every step below and output its checkpoint marker. Do not skip steps. Do not stop early. If context is tight, compress output but still complete every step.
 
 ### Step 1/10 — Validate Config
+- Write breadcrumb: `echo "Step 1/10: Validate Config" > .flywheel/.relay-step`
 - Read `.flywheel/flywheel-config.json`, verify tools are accessible.
 - Fill the "Configured" column of the stage tracker.
 - **Checkpoint:** `✅ Step 1/10: Config validated`
 
 ### Step 2/10 — Read Handoff
+- Write breadcrumb: `echo "Step 2/10: Read Handoff" > .flywheel/.relay-step`
 - Read last 20 entries from `.flywheel/claude-progress.jsonl` + `git log --oneline -20`.
 - **Checkpoint:** `✅ Step 2/10: Handoff context loaded`
 
 ### Step 3/10 — Read Checklist + Select Profile
+- Write breadcrumb: `echo "Step 3/10: Select Feature" > .flywheel/.relay-step`
 - Read `.flywheel/feature-checklist.json`, pick next feature (`needs-fix` first, then highest priority `pending`).
 - Select profile (adaptive or fixed). Present profile choice to user.
 - **Checkpoint:** `✅ Step 3/10: Feature selected — {feat-id}: "{title}" | Profile: {profile}`
 
 ### Step 4/10 — Bootstrap
+- Write breadcrumb: `echo "Step 4/10: Bootstrap" > .flywheel/.relay-step`
 - Run `.flywheel/init.sh` or `init.ps1`. Abort on non-zero exit.
 - **Checkpoint:** `✅ Step 4/10: Bootstrap complete`
 
 ### Step 5/10 — Smoke Test
+- Write breadcrumb: `echo "Step 5/10: Smoke Test" > .flywheel/.relay-step`
 - Run test suite, health check, or build to confirm baseline is healthy.
 - **Checkpoint:** `✅ Step 5/10: Smoke test passed`
 
 ### Step 6/10 — Plan
+- Write breadcrumb: `echo "Step 6/10: Plan" > .flywheel/.relay-step`
 - Invoke the configured planning tool. Do NOT skip even for simple features.
 - **Checkpoint:** `✅ Step 6/10: Plan complete — {tool used}`
 
 ### Step 7/10 — Implement
+- Write breadcrumb: `echo "Step 7/10: Implement" > .flywheel/.relay-step`
 - Implement ONE feature. Write tests. No scope creep.
 - **Checkpoint:** `✅ Step 7/10: Implementation complete`
 
 ### Step 8/10 — Review
+- Write breadcrumb: `echo "Step 8/10: Review" > .flywheel/.relay-step`
 - Run review layers per active profile (see coding-agent-template.md Steps 8a–8f for details).
 - Layers: cleanup → peer-review → cross-model → e2e (code review).
 - Each layer: attempt configured tool first → log error if fail → ask user before fallback.
 - **Checkpoint:** `✅ Step 8/10: Review complete — {layers run summary}`
 
 ### Step 9/10 — Verify
+- Write breadcrumb: `echo "Step 9/10: Verify" > .flywheel/.relay-step`
 - Run platform verification per active profile (see coding-agent-template.md Step 9 for details).
 - Profile gate: `full` = required, `standard` = prompted, `light` = optional, `draft` = skipped.
 - For each configured platform: run the selected verification tool.
@@ -61,12 +72,14 @@ You MUST execute every step below and output its checkpoint marker. Do not skip 
 - **Checkpoint:** `✅ Step 9/10: Verification complete — {platforms tested}`
 
 ### Step 10/10 — Commit + Handoff + Flow Summary
+- Write breadcrumb: `echo "Step 10/10: Commit + Handoff" > .flywheel/.relay-step`
 - **10a.** `git add` + `git commit` with feature ID and title.
 - **10b.** Append handoff entry to `.flywheel/claude-progress.jsonl`.
 - **10c.** Update feature status in `.flywheel/feature-checklist.json` to `implemented`.
 - **10d.** Log rotation if >50 entries.
 - **10e.** Output the **Session Flow Summary** (see coding-agent-template.md Step 10e for exact format).
 - **10f.** User verification checkpoint — prompt user to verify, mark as `verified`/`needs-fix`/`deferred`.
+- Clear breadcrumb: `rm -f .flywheel/.relay-step`
 - **Checkpoint:** `✅ Step 10/10: Session complete — flow summary output`
 
 ---
