@@ -372,6 +372,19 @@ Features are dynamic — add, revise, reprioritize, split, or remove them betwee
 /flywheel:features-list     # Read-only view with progress summary
 ```
 
+## Reset
+
+When you need to clear state, `/flywheel:reset` offers three tiers so you only clear what you mean to:
+
+```
+/flywheel:reset
+  1) Soft    — clear handoff log + reset feature statuses to pending
+  2) Config  — soft reset + drop tool config (re-run /flywheel:init after)
+  3) Full    — delete .flywheel/ entirely (optional: feature branches, planning artifacts)
+```
+
+Every tier requires explicit confirmation and never touches source code.
+
 ## Testing
 
 The E2E test suite invokes `claude -p` against a mock Node.js project, validating artifacts, schemas, and behavior at each flywheel stage.
