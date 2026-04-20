@@ -33,7 +33,8 @@ Operations:
   4) Split — break a feature into sub-features
   5) Remove — delete a feature
   6) Unblock — clear blocked status
-  7) Done — exit
+  7) Import from backlog — promote backlog ideas to features
+  8) Done — exit
 ```
 
 ### 1. Add Features
@@ -95,6 +96,30 @@ When a feature is too large (often discovered when relay marks it `blocked`):
 1. Show all features with `status: "blocked"` and their `blocked_reason`.
 2. User selects which to unblock.
 3. Reset status to `"pending"`, clear `blocked_reason`.
+
+### 7. Import from Backlog
+
+Promote ideas from `.flywheel/backlog.jsonl` into the feature checklist:
+
+1. Read `.flywheel/backlog.jsonl`. If the file doesn't exist or is empty, tell the user: "Backlog is empty. Capture ideas with `/flywheel:backlog <your idea>`." and return to the operations menu.
+2. Display all backlog ideas in a table:
+   ```
+   BACKLOG
+   ┌──────────┬─────────────────────────────────────────┬────────────┐
+   │ ID       │ Idea                                    │ Related to │
+   ├──────────┼─────────────────────────────────────────┼────────────┤
+   │ idea-001 │ add rate limiting per user, not just…   │ feat-003   │
+   │ idea-002 │ settings page search/filter             │ —          │
+   └──────────┴─────────────────────────────────────────┴────────────┘
+   ```
+3. Ask: "Which ideas to promote? (IDs, 'all', or 'none')"
+4. For each selected idea:
+   - If `related_to` points to an existing feature, ask: "Add as an extension of feat-NNN, or create a new feature?"
+     - **Extension**: Append to the related feature's `acceptance_criteria` and optionally revise its title/description. Do not create a new feature entry.
+     - **New feature**: Create a new feature entry using the standard Add flow (auto-ID, ask for priority/criteria).
+   - If no `related_to`, create a new feature entry using the standard Add flow.
+5. After promotion, remove the promoted ideas from `.flywheel/backlog.jsonl`.
+6. Show a summary: "Promoted N ideas → M new features, K extensions. N ideas remain in backlog."
 
 ## After Any Change
 

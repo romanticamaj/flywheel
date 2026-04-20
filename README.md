@@ -372,6 +372,16 @@ Features are dynamic — add, revise, reprioritize, split, or remove them betwee
 /flywheel:features-list     # Read-only view with progress summary
 ```
 
+## Backlog
+
+Capture ideas on the fly without the overhead of defining a full feature. Ideas live in a lightweight backlog until you're ready to promote them:
+
+```
+/flywheel:backlog add rate limiting per user    # Inline capture — one line in, one line out
+/flywheel:backlog list                          # Show all backlog ideas
+/flywheel:features → 7) Import from backlog     # Promote ideas to the feature checklist
+```
+
 ## Reset
 
 When you need to clear state, `/flywheel:reset` offers three tiers so you only clear what you mean to:

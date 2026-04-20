@@ -51,7 +51,8 @@ Each spoke is independent and defines its own contract, detection logic, and fra
 3. Describe your features. The agent generates a prioritized `feature-checklist.json`.
 4. Run `/flywheel:relay` to start a coding session — picks the next feature, implements it, reviews it, commits merge-ready code, and writes a handoff entry.
 5. Repeat `/flywheel:relay` until the checklist is complete.
-6. Run `/flywheel:reset` when you want to clear state — tiered (soft / config / full) so you can restart a cycle, reconfigure tools, or wipe `.flywheel/` entirely without touching source code.
+6. Capture ideas anytime with `/flywheel:backlog <idea>` — they stay in a lightweight backlog until you promote them to the checklist via `/flywheel:features` → Import from backlog.
+7. Run `/flywheel:reset` when you want to clear state — tiered (soft / config / full) so you can restart a cycle, reconfigure tools, or wipe `.flywheel/` entirely without touching source code.
 
 ## flywheel-config.json Reference
 
