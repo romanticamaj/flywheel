@@ -73,6 +73,7 @@ Read `.flywheel/feature-checklist.json` and select the next feature to implement
 3. **First**, check for features with status `needs-fix` — these are user-verified issues that take priority over new work. Pick the highest priority `needs-fix` item.
 4. If no `needs-fix` items, pick the highest priority `pending` item (lowest `priority` number).
 5. Read the feature's `title`, `description`, and `acceptance_criteria` — these define the scope for this session.
+6. If the feature has a `references` array, read each referenced file path or URL to gather context (design docs, specs, ADRs) before planning and implementation.
 
 If no actionable items remain (all `verified`, `blocked`, or `completed`), report "all features complete" and exit the session.
 

@@ -299,8 +299,22 @@ Machine-readable JSON, not markdown. Agents can't cheat the structure.
         "GET /users returns 200 with JSON array of user objects (id, name, email)"
       ],
       "dependencies": [],
+      "references": [],
       "completed_by_session": null
     }
+  ]
+}
+```
+
+The optional `references` field (string array) stores file paths or URLs to source documents — design docs, specs, ADRs, reference sites — that inform the feature's requirements. The coding agent reads referenced files for context before implementation.
+
+```json
+{
+  "id": "feat-002",
+  "title": "Dark theme redesign",
+  "references": [
+    "docs/reference-blakecrosley.md",
+    "docs/plans/2026-03-15-website-redesign-design.md"
   ]
 }
 ```

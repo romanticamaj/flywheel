@@ -753,9 +753,12 @@ Each feature entry follows this schema:
     "Invalid credentials return 401"
   ],
   "dependencies": [],
+  "references": [],
   "completed_by_session": null
 }
 ```
+
+When generating features from source documents (spec files, PRDs, design docs), populate `references` with the file paths that informed each feature's requirements. For example, if `feat-001` was derived from `SPEC.md` and `DESIGN.md`, set `"references": ["SPEC.md", "DESIGN.md"]`.
 
 Valid `status` values: `pending`, `in-progress`, `implemented`, `needs-fix`, `verified`, `blocked`, `split`.
 

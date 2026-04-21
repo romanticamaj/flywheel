@@ -57,6 +57,7 @@ Path: `.flywheel/feature-checklist.json`
         "Invalid credentials return 401"
       ],
       "dependencies": [],
+      "references": [],
       "completed_by_session": null
     }
   ]
@@ -70,6 +71,7 @@ Path: `.flywheel/feature-checklist.json`
 | `version` | Schema version wrapper for future migration. Currently `1`. |
 | `status` | Valid values: `pending`, `in-progress`, `completed`, `blocked` |
 | `dependencies` | Array of feature IDs. Used for ordering — blocked features are skipped. |
+| `references` | Optional array of file paths or URLs to source documents (design docs, specs, ADRs) that inform this feature's requirements. Default: `[]`. |
 | `completed_by_session` | `null` initially. Set to session timestamp (ISO 8601) on completion. |
 | `priority` | Integer. Lower number = higher priority. Coding Agent picks highest priority uncompleted item. |
 

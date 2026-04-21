@@ -50,6 +50,7 @@ When the user wants to add features:
      "status": "pending",
      "acceptance_criteria": ["criterion 1", "criterion 2"],
      "dependencies": [],
+     "references": [],
      "completed_by_session": null
    }
    ```
@@ -61,7 +62,7 @@ When the user wants to add features:
 
 1. User specifies which feature(s) to revise (by ID or title).
 2. Show the current entry.
-3. Accept edits to any field: `title`, `acceptance_criteria`, `dependencies`.
+3. Accept edits to any field: `title`, `acceptance_criteria`, `dependencies`, `references`.
 4. Do NOT allow revising `completed` features without explicit confirmation — warn: "This feature is already completed. Revising it won't re-run implementation. Continue?"
 
 ### 3. Reprioritize
