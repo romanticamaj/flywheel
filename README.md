@@ -390,11 +390,32 @@ Features are dynamic — add, revise, reprioritize, split, or remove them betwee
 
 The E2E test suite invokes `claude -p` against a mock Node.js project, validating artifacts, schemas, and behavior at each flywheel stage.
 
+### Local development setup
+
 ```bash
-# Run all 15 tests (~57 assertions)
+# Clone the repo
+git clone https://github.com/romanticamaj/flywheel.git
+cd flywheel
+
+# Run offline tests first (free, no Claude needed, instant)
+./tests/run-tests.sh --test e2e-offline
+./tests/run-tests.sh --test retool-offline
+
+# Run live tests (requires `claude` CLI authenticated, costs ~$0.30-$2.00 per test)
+./tests/run-tests.sh --test init
+./tests/run-tests.sh --test relay
+
+# Run all 18 tests (~72 assertions)
 ./tests/run-tests.sh --test all
 
-# Run by phase
+# Watch live output from another terminal
+tail -f /tmp/flywheel-test-latest.log
+```
+
+### Test commands
+
+```bash
+# By phase
 ./tests/run-tests.sh --test init              # Initializer artifacts
 ./tests/run-tests.sh --test relay             # 10-step coding agent loop
 ./tests/run-tests.sh --test continuity        # Multi-session handoff
@@ -404,12 +425,18 @@ The E2E test suite invokes `claude -p` against a mock Node.js project, validatin
 # E2E platform tests (offline — no Claude needed)
 ./tests/run-tests.sh --test e2e-offline       # All 4 offline E2E tests
 ./tests/run-tests.sh --test e2e-schema        # Platform-aware config schema
-./tests/run-tests.sh --test e2e-detection     # Marker file → platform mapping
+./tests/run-tests.sh --test e2e-detection     # Marker file to platform mapping
 ./tests/run-tests.sh --test e2e-sources       # Tool install source URLs
 ./tests/run-tests.sh --test e2e-det-table     # Detection table completeness
 
-# Live E2E test (requires Claude)
+# v2.0 improvement tests (offline — no Claude needed)
+./tests/run-tests.sh --test retool-offline    # Impl spoke schema + progressive loading
+./tests/run-tests.sh --test impl-spoke        # Implementation spoke config schema
+./tests/run-tests.sh --test progressive       # Progressive loading structure
+
+# Live E2E tests (requires Claude)
 ./tests/run-tests.sh --test e2e-live          # Init with mobile/web markers
+./tests/run-tests.sh --test retool            # Retool re-detects tools, updates config
 
 # Individual feature tests
 ./tests/run-tests.sh --test features-add
@@ -421,7 +448,7 @@ The E2E test suite invokes `claude -p` against a mock Node.js project, validatin
 ### Test harness features
 
 - **Timeout + heartbeat:** Each test has a configurable timeout (default 180s, relay/continuity 300s). A heartbeat prints progress every 15 seconds.
-- **Step breadcrumbs:** The relay writes `.flywheel/.relay-step` so the heartbeat shows which step Claude is on (e.g., `⏳ relay: 45s — [Step 6/10: Plan]`).
+- **Step breadcrumbs:** The relay writes `.flywheel/.relay-step` so the heartbeat shows which step Claude is on (e.g., `relay: 45s — [Step 6/10: Plan]`).
 - **Budget control:** Per-test budget caps prevent runaway costs. Override with `FLYWHEEL_TEST_BUDGET` env var.
 - **Observable:** All output is teed to `/tmp/flywheel-test-latest.log` for live monitoring via `tail -f`.
 
@@ -442,8 +469,11 @@ The E2E test suite invokes `claude -p` against a mock Node.js project, validatin
 | **13. E2E Sources** | Install source URLs for all E2E tools |
 | **14. E2E Detection Table** | Detection table has entries for all E2E tools |
 | **15. E2E Init** | Init with mobile/web markers produces platform-aware config |
+| **16. Impl Spoke** | Config schema supports `implementation.tool` + alternatives, backwards compatible |
+| **17. Progressive** | Relay compact (<200 lines), Steps 8-9 deferred, clear section headers |
+| **18. Retool** | Re-detects tools, updates config, preserves checklist + handoff + init scripts |
 
-**Requirements:** `claude` CLI (authenticated), `python3`, `git`. Each test call costs ~$0.30–$2.00 (Sonnet; relay/continuity use $2.00 cap, others $1.00).
+**Requirements:** `claude` CLI (authenticated), `python3`, `git`. Each live test costs ~$0.30-$2.00 (Sonnet). Offline tests are free and instant.
 
 **Environment variables:**
 - `FLYWHEEL_TEST_TIMEOUT` — Override default timeout in seconds (default: 180)

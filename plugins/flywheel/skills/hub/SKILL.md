@@ -62,6 +62,10 @@ Path: `.flywheel/flywheel-config.json`
     "tool": "built-in",
     "alternatives": ["planning-with-files", "openspec", "superpowers"]
   },
+  "implementation": {
+    "tool": "built-in",
+    "alternatives": ["superpowers:test-driven-development", "superpowers:incremental-implementation"]
+  },
   "multi_agent": {
     "tool": "claude-code-native",
     "alternatives": ["gstack", "superpowers"]
@@ -132,7 +136,8 @@ Path: `.flywheel/flywheel-config.json`
 |---|---|---|
 | `planning.tool` | string | Active planning tool or `"built-in"` |
 | `planning.alternatives` | string[] | Known planning tools for future upgrades |
-| `multi_agent.tool` | string | Active multi-agent tool or `"claude-code-native"` |
+| `implementation.tool` | string | Active implementation skill or `"built-in"` |
+| `implementation.alternatives` | string[] | Known implementation skills for future upgrades || `multi_agent.tool` | string | Active multi-agent tool or `"claude-code-native"` |
 | `multi_agent.alternatives` | string[] | Known multi-agent tools for future upgrades |
 | `profile.default` | string | `"adaptive"`, `"full"`, `"standard"`, `"light"`, or `"draft"` |
 | `profile.adaptive_rules` | object | Maps feature priority ranges to profiles |

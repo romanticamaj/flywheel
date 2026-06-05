@@ -201,6 +201,7 @@ Check the active Claude Code skills list for known skill names:
 | Spoke | Skill names to look for |
 |---|---|
 | Planning | `planning-with-files`, `superpowers` (brainstorming / writing-plans) |
+| Implementation | `superpowers:test-driven-development`, `superpowers:incremental-implementation`, `superpowers:systematic-debugging` |
 | Multi-agent | `gstack` (Conductor commands), `superpowers` (dispatching-parallel-agents, subagent-driven-development) |
 | Review — cleanup | `superpowers` (code-simplifier / /simplify) |
 | Review — peer-review | `gstack` (/review), `superpowers` (peer-reviewer) |
@@ -251,6 +252,7 @@ Merge results from Steps 1-3 into a single map:
 ```json
 {
   "planning": ["planning-with-files", "openspec", "superpowers"],
+  "implementation": ["superpowers:test-driven-development", "superpowers:incremental-implementation"],
   "multi_agent": ["gstack", "superpowers", "claude-code-native"],
   "review": {
     "cleanup": ["superpowers:/simplify"],
@@ -329,6 +331,17 @@ Present one table per spoke. Always include every tool in the catalog, regardles
 > | 2 | ✅/⬜ | **superpowers** | Brainstorming + writing-plans skills | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
 > | 3 | ✅/⬜ | **OpenSpec** | Structured proposal.md + specs/ directory | `npm install -g openspec` |
 > | 4 | ✅ | **built-in** | Claude generates feature-checklist.json directly, no dependencies | Always available |
+
+#### Implementation
+
+> **Implementation** — engineering practice skill that shapes how Step 7 (Implement) writes code. Optional spoke — `built-in` means write code freely without an enforced workflow.
+>
+> | # | Status | Tool | Description | Install |
+> |---|--------|------|-------------|---------|
+> | 1 | ✅/⬜ | **superpowers:test-driven-development** | Enforces write-failing-test-first then implement workflow | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
+> | 2 | ✅/⬜ | **superpowers:incremental-implementation** | Enforces thin vertical slices, one slice at a time | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
+> | 3 | ✅/⬜ | **superpowers:systematic-debugging** | Structured debugging workflow for bug-fix features | Already a Claude Code plugin — install via `/plugin install superpowers@claude-plugins-official` |
+> | 4 | ✅ | **built-in** | Free-form implementation, no enforced workflow | Always available |
 
 #### Multi-Agent
 
@@ -529,6 +542,10 @@ Full schema — fill in `tool` fields with user's choices from Section 2:
   "planning": {
     "tool": "built-in",
     "alternatives": ["planning-with-files", "openspec", "superpowers"]
+  },
+  "implementation": {
+    "tool": "built-in",
+    "alternatives": ["superpowers:test-driven-development", "superpowers:incremental-implementation"]
   },
   "multi_agent": {
     "tool": "claude-code-native",

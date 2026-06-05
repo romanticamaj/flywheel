@@ -182,6 +182,7 @@ Implement the feature selected in Step 3, following the plan from Step 6. Rules:
 
 - **Strictly one feature.** No scope creep. Do not start a second feature.
 - Reference the feature's `acceptance_criteria` from the checklist as the definition of done.
+- **Implementation spoke:** If `implementation.tool` is configured in `.flywheel/flywheel-config.json`, invoke that skill before writing code (e.g., `superpowers:test-driven-development` enforces write-test-first workflow; `superpowers:incremental-implementation` enforces thin vertical slices). If `implementation.tool` is `"built-in"` or absent, proceed directly.
 - Write tests as part of implementation (unit tests at minimum).
 - Use `multi_agent.tool` from the config when tasks can be parallelized (e.g., independent installations, concurrent tests). Do not default to serial execution when parallel agents are configured.
 
